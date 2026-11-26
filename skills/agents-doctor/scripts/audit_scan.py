@@ -883,13 +883,15 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
             if full_hash is not None:
                 full_hash_by_rel[rel] = full_hash
 
-    # duplicates: group by head hash, full-hash only surviving groups
+    # duplicates: group by head hash, full-hash only surviving groups.
+    # Sorted by path: the walk order differs between systems, and the
+    # order of a report must not
     hashes = {}
-    for size, rels in size_groups.items():
+    for size, rels in sorted(size_groups.items()):
         if len(rels) < 2:
             continue
         first_stage = {}
-        for rel in rels:
+        for rel in sorted(rels, key=lambda r: r.replace('\\', '/').split('/')):
             head = head_by_rel.get(rel)
             if head is None:
                 continue
@@ -942,11 +944,17 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
             s['git'] = state
 
     prof['walk'] = time.monotonic() - _tp; _tp = time.monotonic()
+    def _path_key(rel):
+        # one order on every system, whatever the separator
+        return rel.replace('\\', '/').split('/')
+
     for h, paths in hashes.items():
         if len(paths) > 1:
             sz = (root / paths[0]).stat().st_size
-            rep['duplicates'].append({'size_bytes': sz, 'files': paths})
-    rep['duplicates'].sort(key=lambda g: -g['size_bytes'])
+            rep['duplicates'].append(
+                {'size_bytes': sz, 'files': sorted(paths, key=_path_key)})
+    rep['duplicates'].sort(
+        key=lambda g: (-g['size_bytes'], [_path_key(p) for p in g['files']]))
 
     remotes = {}
     for entry in sorted(root.iterdir(), key=lambda e: e.name):

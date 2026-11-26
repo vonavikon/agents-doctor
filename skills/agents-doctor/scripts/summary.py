@@ -188,9 +188,30 @@ _TEXT = {
 }
 
 
+_WIN_DRIVE = re.compile(r'^[A-Za-z]:/')
+_ANY_SEP = re.compile(r'[\\/]')
+
+
 def _is_abs(path):
     # called on the forward-slash spelling (file_alias normalizes first)
     return bool(re.match(r'^([A-Za-z]:/|/)', path))
+
+
+def _is_win(path):
+    """A path in the Windows style (forward-slash spelling): a drive
+    letter, or two leading slashes for a network share."""
+    return bool(_WIN_DRIVE.match(path)) or path.startswith('//')
+
+
+def base_name(path):
+    """Last element of a path, whatever its separator. A scan made on
+    one system keeps its separators when it is read on another, so
+    os.path.basename would return the whole path."""
+    text = str(path)
+    stripped = text.rstrip('\\/')
+    if not stripped:
+        return text[0]        # the root of a file system: '/' or a backslash
+    return _ANY_SEP.split(stripped)[-1] or '.'
 
 
 def file_alias(path, root=None, home=None):
@@ -200,43 +221,90 @@ def file_alias(path, root=None, home=None):
     the audited folder, '~/...' inside the home directory, or just the
     file name with a marker when they lie elsewhere: an absolute path
     of the machine never leaves this function.
+
+    The paths are compared as text first, so that a scan made on one
+    system can be read on another (a Windows scan on Linux keeps its
+    backslashes); only paths of the running system go through the
+    system's own resolution of links, letter case and short names.
     """
     if not path or not isinstance(path, str):
         return ''
     p = path.replace('\\', '/')
     if not _is_abs(p):
         return p
+    # Windows paths name the same file in any letter case; POSIX paths
+    # only when this is a Windows system (its own POSIX-looking paths)
+    fold = str.lower if (_is_win(p) or os.name == 'nt') else str
 
     def rel_to(base):
         """Path of p relative to base, or None when p is outside base.
-        Case is ignored for the test but kept in the result."""
+        The result keeps the spelling of p."""
         if not base:
             return None
+        b = str(base).replace('\\', '/')
+        if not _is_abs(b):
+            return None
+        if _is_win(p) == _is_win(b):
+            # as text: both are written in the same style
+            strip = b.rstrip('/')
+            if fold(p) == fold(strip):
+                return '.'
+            if fold(p).startswith(fold(strip) + '/'):
+                return p[len(strip) + 1:]
+        if _is_win(p) and os.name != 'nt':
+            return None     # a Windows path on another system: nothing to resolve
         try:
             real = os.path.normcase(os.path.realpath(p))
-            base_real = os.path.normcase(os.path.realpath(str(base)))
+            base_real = os.path.normcase(os.path.realpath(b))
             rel = os.path.relpath(real, base_real)
         except (OSError, ValueError):
             return None
         if rel == '..' or rel.startswith('..' + os.sep):
             return None
         if rel == '.':
-            return base_name(base)
+            return '.'
         # take the tail of the original spelling, so the letter case of
         # the real path survives (normcase lowercases on Windows)
         depth = len(rel.replace('\\', '/').split('/'))
         return '/'.join(p.split('/')[-depth:])
 
-    def base_name(base):
-        return os.path.basename(str(base).rstrip('\\/')) or '.'
+    def inside(base):
+        """The alias of p when it lies under base, else None."""
+        rel = rel_to(base)
+        if rel is None:
+            return None
+        return base_name(base) if rel == '.' else rel
 
-    inside = rel_to(root)
-    if inside is not None:
-        return inside
-    inside_home = rel_to(home)
-    if inside_home is not None:
-        return '~/' + inside_home if inside_home != base_name(home) else '~/'
+    spot = inside(root)
+    if spot is not None:
+        return spot
+    spot = inside(home)
+    if spot is not None:
+        return '~/' + spot if spot != base_name(home) else '~/'
     return '<outside audit area>/' + p.rsplit('/', 1)[-1]
+
+
+def under(path, base):
+    """True when path lies inside base. Paths of this system are
+    compared after resolution: a temporary folder can be spelled short
+    in one place and long in another, and the two are the same folder.
+    Paths of another system are compared as text only."""
+    p = str(path or '').replace('\\', '/')
+    b = str(base or '').replace('\\', '/')
+    if not p or not b or not _is_abs(p) or not _is_abs(b):
+        return False
+    if _is_win(p) == _is_win(b):
+        fold = str.lower if (_is_win(p) or os.name == 'nt') else str
+        if fold(p).startswith(fold(b.rstrip('/')) + '/'):
+            return True
+    if _is_win(p) and os.name != 'nt':
+        return False
+    try:
+        real = os.path.normcase(os.path.realpath(p))
+        base_real = os.path.normcase(os.path.realpath(b)).rstrip('\\/')
+    except OSError:
+        return False
+    return real.startswith(base_real + os.sep)
 
 
 _SKILL_IN_TITLE = re.compile(r"[Ss]kill '([^']+)'")
@@ -516,11 +584,10 @@ def _scope(finding, rep):
     findings come last and are counted rather than listed."""
     evidence = finding.get('evidence') or []
     first = evidence[0] if evidence and isinstance(evidence[0], dict) else {}
-    path = str(first.get('file') or first.get('path') or '').replace('\\', '/')
-    if any(marker in path for marker in _PLUGIN_MARKERS):
+    path = str(first.get('file') or first.get('path') or '')
+    if any(marker in path.replace('\\', '/') for marker in _PLUGIN_MARKERS):
         return 2
-    home = str(rep.get('home') or '').replace('\\', '/')
-    if home and path.startswith(home):
+    if under(path, rep.get('home')):
         return 1
     return 0
 
@@ -636,7 +703,8 @@ def build(rep, lang=glossary.DEFAULT_LANG, files=None):
     root = rep.get('root') or '.'
     return {
         'lang': lang,
-        'name': os.path.basename(str(root).rstrip('\\/')) or str(root),
+        # the folder's own name, whatever separator the scan's root uses
+        'name': base_name(root),
         'coverage': _coverage_lines(rep, lang),
         'gates': gates,
         'findings': shown,

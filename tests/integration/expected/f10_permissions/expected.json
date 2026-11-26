@@ -1,7 +1,7 @@
 {
-  "description": "Unreadable directory holding a secret; the scan must survive without reading it. POSIX-only: Windows cannot chmod a directory away from readable, so the fixture degenerates there (the unit suite skips it too). Gates other than 6 and the secrets count were verified via the Windows run of the same tree; G6=warn and secrets=0 follow from the unreadable-content contract asserted by test_f10_permissions.",
+  "description": "Unreadable directory holding a secret; the scan must survive without reading it. POSIX-only: Windows cannot chmod a directory away from readable, so the fixture degenerates there (the unit suite skips it too). Gates other than 6 and the secrets count were verified via the POSIX run of the same tree; G5 is not_applicable (no skills anywhere) and G7 is not_applicable (no git). G6=pass and secrets=0 follow from the unreadable-content contract asserted by test_f10_permissions: no key in the files that could be read, and without git there is no prevention to miss.",
   "skip_on": ["nt"],
-  "gates": {"1": "pass", "2": "warn", "3": "pass", "4": "warn", "5": "pass", "6": "warn", "7": "not_applicable", "8": "pass", "9": "pass"},
+  "gates": {"1": "pass", "2": "warn", "3": "pass", "4": "warn", "5": "not_applicable", "6": "pass", "7": "not_applicable", "8": "pass", "9": "pass"},
   "counts": {"secrets": 0, "junk_files": 0, "junk_dirs": 0, "empty_dirs": 0, "duplicates": 0, "large_files": 0, "context_drift": 0, "dup_checkouts": 0},
   "no_leak": ["sk-DEMO-locked-0000000000"],
   "findings_schema": true

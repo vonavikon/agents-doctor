@@ -317,5 +317,107 @@ class OwnSourceLineTests(unittest.TestCase):
                     self.assertNotIn(line.split(' (')[0], self._text(skipped, lang))
 
 
+class ForeignScanTests(unittest.TestCase):
+    """A scan made on one system and read on another keeps the paths of
+    the system that made it. The digest must treat them as paths, not
+    depend on the separators of the system that reads them (the fixtures
+    of the LLM eval carry Windows paths and are graded on Linux too)."""
+
+    ROOT = 'C:\\workspaces\\demo\\workspace'
+    HOME = 'C:\\workspaces\\demo\\home'
+
+    def _finding(self, fid, check_id, evidence):
+        return {'fid': fid, 'gate': 'G3', 'category': 'rules',
+                'severity': 'medium', 'status': 'fail', 'title': 'x',
+                'description': '', 'evidence': evidence, 'confidence': 0.9,
+                'recommendation': 'x', 'autofix_available': False,
+                'check_id': check_id}
+
+    def _rep(self):
+        return {'root': self.ROOT, 'home': self.HOME, 'gates': [],
+                'findings_detailed': [
+                    self._finding('RUL-002', 'RUL_DEAD_REFERENCE',
+                                  [{'file': self.ROOT + '\\.agents\\x\\SKILL.md'}]),
+                    self._finding('RUL-001', 'CLAUDE_IMPORT_MISSING',
+                                  [{'file': self.HOME + '\\.claude\\CLAUDE.md',
+                                    'import': self.HOME + '\\rules\\absent.md'}])]}
+
+    def test_the_title_names_the_folder_and_nothing_longer(self):
+        quoted = {'ru': '«workspace»', 'en': '"workspace"'}
+        for lang in ('ru', 'en'):
+            with self.subTest(lang=lang):
+                digest = summary.build(self._rep(), lang)
+                self.assertEqual(digest['name'], 'workspace')
+                text = summary.render(digest)
+                self.assertIn(quoted[lang], text)
+                self.assertNotIn('C:\\workspaces', text)
+                self.assertNotIn('C:/workspaces', text)
+
+    def test_files_are_named_from_the_audited_folder_and_from_home(self):
+        self.assertEqual(summary.file_alias(self.ROOT + '\\.mcp.json',
+                                            self.ROOT, self.HOME), '.mcp.json')
+        self.assertEqual(summary.file_alias(self.HOME + '\\.claude\\CLAUDE.md',
+                                            self.ROOT, self.HOME),
+                         '~/.claude/CLAUDE.md')
+        # Windows paths name the same file in any letter case
+        self.assertEqual(summary.file_alias('C:\\WORKSPACES\\demo\\workspace\\a.md',
+                                            self.ROOT, self.HOME), 'a.md')
+        # on another drive, far away: the file name only
+        self.assertEqual(summary.file_alias('D:\\elsewhere\\notes.md',
+                                            self.ROOT, self.HOME),
+                         '<outside audit area>/notes.md')
+
+    def test_digest_carries_the_places_and_not_the_root(self):
+        for lang in ('ru', 'en'):
+            with self.subTest(lang=lang):
+                digest = summary.build(self._rep(), lang)
+                places = {f['code']: f['where'] for f in digest['findings']}
+                self.assertEqual(places['RUL_DEAD_REFERENCE'],
+                                 '.agents/x/SKILL.md')
+                self.assertEqual(places['CLAUDE_IMPORT_MISSING'],
+                                 '~/.claude/CLAUDE.md, @~/rules/absent.md')
+                self.assertNotIn(self.ROOT, summary.render(digest))
+
+    def test_home_findings_are_told_from_the_folder_by_their_place(self):
+        rep = self._rep()
+        in_folder, in_home = rep['findings_detailed']
+        self.assertEqual(summary.scope(in_folder, rep), 0)
+        self.assertEqual(summary.scope(in_home, rep), 1)
+        # the audited folder comes first, wherever the reader runs
+        order = [f['id'] for f in summary.build(rep, 'ru')['findings']]
+        self.assertEqual(order, ['RUL-002', 'RUL-001'])
+
+    def test_base_name_splits_on_both_separators(self):
+        self.assertEqual(summary.base_name('C:\\a\\b\\c'), 'c')
+        self.assertEqual(summary.base_name('C:\\a\\b\\'), 'b')
+        self.assertEqual(summary.base_name('/a/b/c'), 'c')
+        self.assertEqual(summary.base_name('/'), '/')
+        self.assertEqual(summary.base_name('.'), '.')
+
+
+class PathCompareTests(unittest.TestCase):
+    """A temporary folder can be spelled short in one place and long in
+    another (CI runners), or with `..` in the middle: same folder."""
+
+    def test_under_resolves_the_paths_of_this_system(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp).resolve()
+            home = base / 'home'
+            (home / 'notes').mkdir(parents=True)
+            spelled = base / 'x' / '..' / 'home'       # never created: x
+            file = str(home / 'notes' / 'a.md')
+            self.assertTrue(summary.under(file, str(spelled)))
+            self.assertTrue(summary.under(str(spelled / 'notes' / 'a.md'), home))
+            self.assertFalse(summary.under(str(base / 'elsewhere' / 'a.md'), home))
+            self.assertFalse(summary.under(file, None))
+            self.assertFalse(summary.under('notes/a.md', home))
+
+    def test_under_compares_foreign_paths_as_text(self):
+        self.assertTrue(summary.under('C:\\w\\home\\a.md', 'C:\\w\\home'))
+        self.assertTrue(summary.under('C:\\W\\HOME\\a.md', 'C:\\w\\home'))
+        self.assertFalse(summary.under('C:\\w\\homex\\a.md', 'C:\\w\\home'))
+        self.assertFalse(summary.under('C:\\w\\home\\a.md', '/w/home'))
+
+
 if __name__ == '__main__':
     unittest.main()

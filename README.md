@@ -194,7 +194,7 @@ cd qa && python eval.py
 Scenario fixtures with expected results locked before the run; the runner compares the scanner's actual JSON against the locked expectations and writes a report. The current numbers live in the generated line below — never edited by hand (`python tools/check_readme_facts.py`, staleness-gated in CI).
 
 <!-- facts-begin -->
-**Facts:** 1429 tests · QA eval 267 PASS · deterministic scanner, no dependencies
+**Facts:** 1437 tests · QA eval 267 PASS · deterministic scanner, no dependencies
 <!-- facts-end -->
 
 The deterministic core also has a unit and security-regression suite:

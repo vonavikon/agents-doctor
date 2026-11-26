@@ -95,6 +95,10 @@ only) and every old CLI flag works as before.
   adding it (the snapshot holds paths of the machine).
 - "Not checked" says why (no facts, search truncated, history partially
   scanned) in the digest, the technical report and the plain report.
+- A scan made on one system can be read on another: paths are compared
+  as text whatever their separator, and the folder's name is taken with
+  both separators. Files of one duplicate group are listed in path
+  order on every system (the walk order differs between them).
 - The plain report names the checks that could not run: one sentence in
   its short version and a section with the reason for each check,
   in English and in Russian. A check that could not run inside a red or
@@ -123,7 +127,7 @@ only) and every old CLI flag works as before.
   graded by `llm-eval/grade_answer.py` against rubric A1-A12. The
   offline CI run requires good samples to pass every critical check,
   bad samples to be caught and malformed input to be rejected.
-- 1429 tests, QA eval 267 PASS.
+- 1437 tests, QA eval 267 PASS.
 
 ## [3.0.1] - 2026-11-18
 

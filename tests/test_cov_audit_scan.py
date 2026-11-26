@@ -815,6 +815,19 @@ class DedupReadOnceTests(TmpCase):
         rep, _ = self._scan_counting()
         self.assertEqual(rep['duplicates'], [])
 
+    def test_duplicate_files_are_listed_in_path_order(self):
+        # created out of order: the walk order differs between systems,
+        # the report must read the same everywhere
+        data = bytes(range(256)) * 8
+        for name in ('dup/q.bin', 'dup/p.bin', 'dup/s.bin', 'dup/o.bin'):
+            p = self.root / name
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(data)
+        rep = audit_scan.scan(self.root, self.home, False)
+        self.assertEqual([g['files'] for g in rep['duplicates']],
+                         [[os.sep.join(('dup', n)) for n in
+                           ('o.bin', 'p.bin', 'q.bin', 's.bin')]])
+
 
 # --- without git ----------------------------------------------------------------
 

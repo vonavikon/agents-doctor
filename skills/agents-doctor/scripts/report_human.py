@@ -1074,7 +1074,7 @@ def generate_human_markdown(rep, lang='en', sessions_per_day=10, after=None):
     if lang not in STRINGS:
         raise ValueError(f'unsupported lang: {lang!r}')
     s = STRINGS[lang]
-    folder = os.path.basename(str(rep.get('root') or '.').rstrip('\\/')) or '.'
+    folder = summary.base_name(rep.get('root') or '.')
     out = ['# ' + s['title'], '',
            s['subtitle'].format(root=folder), '']
     out.extend(_short_version(rep, lang))
