@@ -24,11 +24,26 @@ python skills/agents-doctor/scripts/audit_scan.py <path> --home <home> --out sca
 
 ## First run
 
-Ask the agent to run a workspace audit. The plugin runs the deterministic
-scanner over the folder, reads the JSON it produces, filters false
-positives and writes the report. Without an agent, run the scanner
-yourself and read `scan.json`; a stage-4 CLI entry
-(`scripts/agents_doctor.py`) can also turn it into a markdown report.
+Ask the agent: "Audit my workspace" (or «проведи аудит моего рабочего
+пространства»). The plugin runs one deterministic command over the
+folder, reads the short digest it prints and answers in plain words, in
+your language: what the main problem is, where to start, what else was
+found, what can be improved. It never opens the full scan and never
+shows a code (G6, SEC-001) in the text for you. The command also leaves
+two reports on disk: a plain-language one and a technical one.
+
+Without an agent, run the command yourself:
+
+```
+python skills/agents-doctor/scripts/agents_doctor.py audit <path> \
+    --out <path>/.agents-doctor/scan.json \
+    --human <path>/.agents-doctor/REPORT.md \
+    --report <path>/.agents-doctor/AUDIT.md --lang ru --summary
+```
+
+`--lang ru|en` picks the language of the plain report and the digest.
+The scanner alone (`scripts/audit_scan.py <path> --home <home> --out
+scan.json`) writes only the JSON.
 
 The scan knows eight harnesses (Claude Code, Codex, Cursor, Gemini CLI,
 OpenCode, GitHub Copilot, Windsurf, Z Code) and reports, per
@@ -43,14 +58,19 @@ instruction sources disagree — the exact conflict. Two follow-ups:
 
 ## Reading the report
 
-The report is a gates table first, then findings grouped by block. Two
-scales are in play and they are independent:
+The plain-language report leads with the main problem, then lists every
+finding with its place and what to do, what can be made better and where
+to start. Checks and findings are named in words; every name comes from
+the glossary (`skills/agents-doctor/references/glossary.md`). Behind the
+words two scales are in play, and they are independent:
 
 - Gate and finding status: `pass`, `fail`, `warn`, `unknown`,
   `not_applicable`. Status is the outcome of a check.
   `unknown` means the check could not run: missing data never reads as a
   pass. `not_applicable` means the check had nothing to look at (for
-  example git hygiene in a workspace with no repositories).
+  example git hygiene in a workspace with no repositories). The report
+  says which is which and why: "not checked" is never summed up as fine,
+  and "not applicable" is never counted as a problem.
 - Finding severity: `critical`, `high`, `medium`, `low`, `info`. Severity
   is the impact when a check does not pass.
 
@@ -69,10 +89,15 @@ always a fail. Start with failed gates, then sort findings by severity.
 
 | File | What it is |
 |---|---|
-| `<root>/agents-doctor-scan.json` | Scanner output: facts, nine gates, typed findings. Keep it; it is the baseline for the next compare. |
-| `<root>/AUDIT-<date>.md` | The readable report written by the skill (or by `report_generator.py`). |
+| `<root>/.agents-doctor/REPORT.md` | The plain-language report: for people who do not work with code. |
+| `<root>/.agents-doctor/AUDIT.md` | The technical report: gate results with reasons, every finding with its location and what to do. |
+| `<root>/.agents-doctor/scan.json` | Scanner output: facts, nine gates, typed findings. Keep it; it is the baseline for the next compare and what the UI and `fix` read. Large, with absolute paths: not meant to be read. |
+| `<root>/.agents-doctor/history.db` | Local audit history, written on every full audit. |
 
-Both files stay in the audited root. Nothing else is written anywhere.
+Everything stays under `<root>/.agents-doctor/`. Nothing else is written
+anywhere. When the audited folder is a git repository, add
+`.agents-doctor/` to its `.gitignore`: the scan file holds paths of
+this machine.
 
 ## What the plugin never does
 

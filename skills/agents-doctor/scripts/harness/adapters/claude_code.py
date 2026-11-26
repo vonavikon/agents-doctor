@@ -64,6 +64,35 @@ def _read_text(path: Path) -> str:
         return ''
 
 
+def _is_file(path: Path) -> bool:
+    try:
+        return path.is_file()
+    except OSError:
+        return False
+
+
+# placeholder location for an import target that exists outside the
+# audited area: the real path is neither read nor reported
+_OUTSIDE_AREA = Path('<outside audit area>')
+
+
+def _inside_area(ctx: HarnessContext, path: Path) -> bool:
+    """True when path lies inside the workspace root or the home
+    directory, compared on resolved paths (symlinks included)."""
+    try:
+        resolved = path.resolve()
+    except OSError:
+        resolved = path
+    for area in (ctx.root, ctx.home):
+        try:
+            area = area.resolve()
+        except OSError:
+            pass
+        if resolved == area or area in resolved.parents:
+            return True
+    return False
+
+
 def _load_json(path: Path):
     try:
         with open(path, 'r', encoding='utf-8') as fh:
@@ -367,31 +396,74 @@ class ClaudeCodeAdapter(HarnessAdapter):
         srcs.extend(self._collect_rules(ctx))
         return srcs
 
+    @staticmethod
+    def _import_target(ctx: HarnessContext, origin: Path, raw: str):
+        """Where one @import points.
+
+        Returns (path, state); state is one of
+          'found'   - the file exists inside the audited area
+                      (workspace root or home) and is loaded,
+          'outside' - the file exists but lies outside the audited area:
+                      named, never read,
+          'missing' - no such file where the import can point to.
+        path is None only for 'missing'.
+
+        '@~/x' resolves against the user's home as the scanner sees it
+        (ctx.home, so an isolated --home works), an absolute path is
+        taken as is; anything else is relative to the importing file,
+        then to the workspace root.
+        """
+        spec = raw.replace('\\', '/')
+        if spec.startswith('~/'):
+            candidates = [ctx.home_path(*spec[2:].split('/'))]
+        elif os.path.isabs(spec) or re.match(r'^[A-Za-z]:/', spec):
+            candidates = [Path(spec)]
+        else:
+            candidates = [origin.parent.joinpath(*spec.split('/')),
+                          ctx.root.joinpath(*spec.split('/'))]
+        for cand in candidates:
+            if ctx.exists(cand) and _is_file(cand):
+                return cand, ('found' if _inside_area(ctx, cand) else 'outside')
+        return None, 'missing'
+
     def _expand_imports(self, ctx: HarnessContext, base_files: list):
         """Walk @path.md imports starting from the CLAUDE.md files.
         Returns (entries, missing): entries are dicts with source/parent/
-        depth/loaded/reason, missing are dead @references."""
+        depth/loaded/reason, missing are dead @references.
+
+        An import whose target lies outside the audited area is an entry
+        with outside=True and loaded=False (reason says so): it is neither
+        dead nor read."""
         entries, missing = [], []
         seen = {_norm(f) for f in base_files}
+        seen_outside = set()
 
         def expand(origin: Path, depth: int):
             for raw in _IMPORT_RE.findall(_read_text(origin)):
-                candidate = origin.parent / raw
-                if candidate.exists():
-                    resolved = candidate
-                else:
-                    alt = ctx.root / raw
-                    if alt.exists():
-                        resolved = alt
-                    else:
-                        missing.append({'file': str(origin), 'import': raw})
-                        continue
-                key = _norm(resolved)
+                candidate, state = self._import_target(ctx, origin, raw)
+                if state == 'missing':
+                    missing.append({'file': str(origin), 'import': raw})
+                    continue
+                if state == 'outside':
+                    if raw not in seen_outside:
+                        seen_outside.add(raw)
+                        entries.append({
+                            'source': InstructionSource(
+                                _OUTSIDE_AREA / Path(raw.replace('\\', '/')).name,
+                                'imported',
+                                'imported from %s (outside the audited area)'
+                                % origin.name),
+                            'parent': origin, 'depth': depth + 1,
+                            'loaded': False, 'outside': True,
+                            'reason': 'outside the audited area '
+                                      '(workspace root and home)'})
+                    continue
+                key = _norm(candidate)
                 if key in seen:
                     continue
                 seen.add(key)
                 src = InstructionSource(
-                    resolved, 'imported',
+                    candidate, 'imported',
                     'imported from %s' % origin.name)
                 hop = depth + 1
                 if hop > IMPORT_MAX_DEPTH:
@@ -402,7 +474,7 @@ class ClaudeCodeAdapter(HarnessAdapter):
                     continue
                 entries.append({'source': src, 'parent': origin,
                                 'depth': hop, 'loaded': True, 'reason': ''})
-                expand(resolved, hop)
+                expand(candidate, hop)
 
         for f in base_files:
             expand(f, 0)
@@ -443,7 +515,7 @@ class ClaudeCodeAdapter(HarnessAdapter):
     def _check_imports(self, ctx: HarnessContext) -> list:
         findings = []
         _base, entries, missing = self._gather(ctx)
-        over = [e for e in entries if not e['loaded']]
+        over = [e for e in entries if not e['loaded'] and not e.get('outside')]
         if over:
             findings.append(AdapterFinding(
                 check_id='CLAUDE_IMPORT_DEPTH',
@@ -457,6 +529,23 @@ class ClaudeCodeAdapter(HarnessAdapter):
                           for e in over],
                 recommendation='flatten the @import chain.',
                 confidence=0.8))
+        # targets that exist but lie outside the audited area: not dead,
+        # and not verified either
+        outside = [e for e in entries if e.get('outside')]
+        if outside:
+            findings.append(AdapterFinding(
+                check_id='CLAUDE_IMPORT_OUTSIDE',
+                category='instructions', severity='low', status='unknown',
+                title='CLAUDE.md imports files outside the audited area',
+                description=('%d @import target(s) exist but lie outside the '
+                             'workspace and the home directory; their content '
+                             'was not read, so they are unverified.' % len(outside)),
+                evidence=[{'file': str(e['source'].path),
+                           'imported_from': e['parent'].name if e['parent'] else ''}
+                          for e in outside],
+                recommendation='Nothing to fix unless the import is a mistake: '
+                               'audit that folder separately to check the file.',
+                confidence=0.9))
         if missing:
             findings.append(AdapterFinding(
                 check_id='CLAUDE_IMPORT_MISSING',

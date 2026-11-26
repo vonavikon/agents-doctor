@@ -19,14 +19,29 @@ Status (outcome of a check), worst first:
 | `pass` | The check ran and found nothing. |
 | `not_applicable` | The check had nothing to look at (for example git hygiene without repositories). |
 
+A rule that ends `unknown` or `not_applicable` always says why: the
+rule carries a `reason` (English) and a `why` code from the glossary
+(`no_skills_found`, `no_git`, `history_not_scanned`, `facts_missing`,
+...), and a gate whose status is one of the two repeats the first such
+reason as `status_reason`. An empty result is not a pass: a search that
+found no skills is `not_applicable` with the number of folders checked,
+a search that could not read a folder is `unknown`, and a folder cut by
+the per-folder limit makes every rule it feeds `unknown`. The reports
+and the digest print these reasons in words.
+
+Every finding carries a stable `check_id` (its type, e.g.
+`SEC_EXPOSED_SECRET`, `SKL_FRONTMATTER_INVALID`); the `fid` is only the
+per-scan counter. The plain name of each type is in
+[references/glossary.md](../skills/agents-doctor/references/glossary.md).
+
 Severity (impact when a check does not pass):
 
 | Severity | Used for |
 |---|---|
 | `critical` | Exposed, staged or tracked secrets; credentials in remote URLs. |
 | `high` | Structural breakage: drifted instruction pairs, unparseable skill frontmatter, over-limit descriptions, diverged skill copies, broken configs. |
-| `medium` | Problems that corrupt decisions: dead references; content quality (signal-to-noise, generic phrases, contradictions), nested repos, heavy unowned dirs, oversized tracked files, junk over the fail line. |
-| `low` | Hygiene: uncommitted work, missing .gitignore, loose folders, boilerplate. |
+| `medium` | Problems that corrupt decisions: dead references; content quality (signal-to-noise, generic phrases, contradictions), nested repos, heavy unowned dirs, oversized tracked files, junk over the fail line; a key in a file that `.gitignore` keeps out of git. |
+| `low` | Hygiene: uncommitted work, missing .gitignore, loose folders, boilerplate; a possible key in a large library file. |
 | `info` | Observations: a few empty dirs, occasional harnesses. |
 
 Severity and status are independent axes: a `low` finding can fail a gate,
@@ -50,6 +65,23 @@ Evidence comes from `context_drift` (pair similarity by Jaccard index),
 `top_level[].extra.nested_repos` and the `harness` section (tool states
 plus project dirs). Drift confidence is 0.9; the harness-conflict rule
 derives activity from marker-file freshness.
+
+A nested repository that the outer repository's `.gitignore` keeps out
+(`extra.nested_repos_ignored`) is a layout its owner chose, the usual
+way to vendor a clone: it is not reported. When the audited folder is
+itself a repository, every repository found inside it belongs to it.
+
+## The audited folder as a repository
+
+Most workspaces are a project folder that is a git repository. The
+scanner reads its git side like that of any other repository: status,
+remote, hooks, index (`git grep --cached`), history with `--deep`. It is
+listed first in `top_level` under the name `.`, with two more facts:
+`extra.top_status` (top-level entries git reports as a whole, untracked
+or ignored) and `extra.tool_dir_ignored` (whether `.agents-doctor/` is
+kept out of git). Repositories deeper than the first level are not read;
+they are counted, listed (`SEC_GIT_SIDE_UNVERIFIED`) and turn a clean
+result into `unknown`, never into `pass`.
 
 ## G2 Configuration integrity
 
@@ -91,6 +123,12 @@ Evidence from `heavy_outside_git` (size and depth per directory) and
 the fate is undecided. The skill asks the user before proposing repo,
 archive or deletion.
 
+When the audited folder is itself a repository, its top-level folders
+hold tracked files unless git lists them as a whole: only the untracked
+ones are reported, and folders kept out by `.gitignore` are the owner's
+decision. The tool's own `.agents-doctor/` and `.agents-doctor-trash/`
+are never reported.
+
 ## G5 Skills and agent capabilities
 
 | Condition | When |
@@ -124,7 +162,33 @@ with `tracked_secrets` (from `git grep` over the index with the same
 redaction path) and `credentials_in_remote`, plus hook flags. Git history
 is scanned only with `--deep`. Every secret finding is `critical` with
 confidence from the matching rule (0.7 for generic literal assignments,
-0.9-0.99 for token shapes and private-key headers).
+0.9-0.99 for token shapes and private-key headers), with one exception
+below.
+
+**What to do about a key depends on where its file sits.** The scanner
+asks git for every file with a key (`secrets[].git`, repeated on the
+finding's evidence):
+
+| `git` | Severity, status | Finding and advice |
+|---|---|---|
+| `tracked` (in the index, staged included) | `critical`, `fail` | The file leaves with every clone: rotate the key, take the file out of the project and its history. The same key is not reported a second time from the index. |
+| `untracked` (in the folder, not added yet) | `critical`, `fail` | The next `git add` can take it: add the file to `.gitignore`; rotate the key if the file was ever shared. |
+| `ignored` (kept out by `.gitignore`) | `medium`, `warn` | The usual place for local settings, a risk only when the file itself is shared: keep it out of archives, shared folders and mail. |
+| absent (no repository around the file, or git failed) | `critical`, `fail` | As before: rotate the key, remove it from the file and purge the history. |
+
+The plugin's own source tree is not scanned for keys, in the worktree or
+in the git index: its test corpus of fake keys and its masking code are
+not the user's data. A folder is the plugin's source only when it holds
+both `audit_scan.py` and `secret_rules.py` (up to three levels above the
+file); one file of that name alone changes nothing. The worktree scan
+counts the files it leaves out in `stats.own_source_skipped`, and the
+digest prints the count when it is above zero.
+
+The worktree scan does not read files of 1 MB or more for keys. A hit
+from the git index in such a file (`tracked_secrets[].in_bundle`) is not
+judged: it is reported as `low`, `warn`
+(`SEC_TRACKED_SECRET_BUNDLE`, confidence 0.5) with "look at the line by
+hand", never as a key, and it comes after the real hits.
 
 ## G7 Git hygiene
 
@@ -134,10 +198,12 @@ confidence from the matching rule (0.7 for generic literal assignments,
 | fail | A tracked file at or over 5 MB. |
 | warn | Uncommitted or untracked work; a repo without `.gitignore`; several checkouts of one remote. |
 
-With no git repositories at the top level all rules report
-`not_applicable`. Evidence from `top_level[].git` (dirty and untracked
-paths), `extra.gitignore`, `large_files` and `dup_checkouts` (grouped by
-remote URL).
+With no git repository at all all rules report `not_applicable`. The
+audited folder itself counts when it is a repository (listed as `.`).
+Evidence from `top_level[].git` (dirty and untracked paths),
+`extra.gitignore`, `large_files` and `dup_checkouts` (grouped by remote
+URL). When repositories deeper than the first level exist, a rule that
+would be `pass` is `unknown` instead: their state was not read.
 
 ## G8 Agent environment governance
 
@@ -165,7 +231,9 @@ Evidence from `junk_classified` (classes `confirmed_unused`,
 `potentially_unused`, `unknown`, with git/reference/age signals),
 `junk.files/dirs/empty_dirs`, `harness.tools` states and `large_files`.
 Junk findings carry the classifier's confidence (0.7-0.9); the volume rule
-computes the total from byte sums, confidence 0.95.
+computes the total from byte sums, confidence 0.95. In a folder that is
+itself a repository, "outside git" is decided per file by git
+(`large_files[].tracked`).
 
 ## Missing data
 

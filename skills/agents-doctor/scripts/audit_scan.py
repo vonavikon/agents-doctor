@@ -46,7 +46,7 @@ MEMORY_LIMIT = 24985             # memory index load limit (24.4 KB)
 MEMORY_LINE_LIMIT = 200          # memory loads up to 200 lines or 25 KB, whichever comes first
 CHAIN_BUDGET = 32768             # Codex budget for the root + nested AGENTS.md chain
 SKILL_DESC_LIMIT = 1024          # Z Code skill description limit
-RULES_VERSION = '3.0.0'          # rule set version, goes into the report
+RULES_VERSION = '3.1.0'          # rule set version, goes into the report
 HARNESS_STALE_DAYS = 90          # older: harness counts as abandoned
 HARNESS_FRESH_DAYS = 30          # newer: active
 
@@ -67,6 +67,9 @@ GENERIC_MARKERS = [
 BUILD_DIRS = {'node_modules', '__pycache__', '.venv', 'venv', 'dist',
               'build', 'target', '.cache', '.idea', '.pytest_cache'}
 BIG_FILE_BYTES = 5 * 1024 * 1024
+# files of this size and more are not read for keys: bundles and minified
+# libraries live there, and their keyword literals are examples
+SECRET_FILE_MAX_BYTES = 1024 * 1024
 DUP_MIN_BYTES = 1024
 DUP_MAX_BYTES = 50 * 1024 * 1024
 TEXT_EXTS = {'.json', '.md', '.yml', '.yaml', '.toml', '.env', '.txt',
@@ -193,13 +196,135 @@ def nested_repos(p):
     return found
 
 
+def _norm_rel(rel):
+    return str(rel).replace('\\', '/')
+
+
+# files that together mark the source tree of this plugin
+OWN_SOURCE_MARKERS = ('audit_scan.py', 'secret_rules.py')
+
+
+def _own_source_dir(directory, root, cache):
+    """True when the directory lies inside the source tree of this
+    plugin: a folder holding both audit_scan.py and secret_rules.py, up
+    to three levels up. Both files are needed, so that one file of the
+    user's own named like the scanner does not turn the key check off
+    for its folder. The plugin's test corpus of fake keys and its
+    masking code are not the user's data, and a workspace that keeps a
+    copy of the plugin must not start every audit with forty "keys" of
+    its own. The worktree scan counts what it leaves out
+    (stats.own_source_skipped)."""
+    key = str(directory)
+    if key in cache:
+        return cache[key]
+    cur, found = Path(directory), False
+    for _ in range(4):
+        if all(_exists(cur / name) for name in OWN_SOURCE_MARKERS):
+            found = True
+            break
+        if cur == root or cur.parent == cur:
+            break
+        cur = cur.parent
+    cache[key] = found
+    return found
+
+
+def _chunks(items, size=40):
+    items = list(items)
+    for i in range(0, len(items), size):
+        yield items[i:i + size]
+
+
+def _ignored_files(repo, rels):
+    """Paths (relative to repo) that .gitignore keeps out of git.
+    Unknown when git fails: then nothing is ignored, which is the safe
+    side for every caller."""
+    ignored = set()
+    # git quotes a path given with backslashes; forward slashes come
+    # back as they went in
+    for chunk in _chunks(_norm_rel(p) for p in rels):
+        # exit code 1 means "none of them is ignored"
+        rc, out = run_git(repo, '-c', 'core.quotepath=false',
+                          'check-ignore', '--', *chunk)
+        if rc in (0, 1):
+            ignored.update(_norm_rel(line.strip()) for line in out.splitlines()
+                           if line.strip())
+    return ignored
+
+
+def git_file_states(root, git_roots, rels):
+    """Where files sit in the nearest repository around them:
+    'tracked' (in the index, staged included), 'ignored' (kept out by
+    .gitignore) or 'untracked' (in the folder, not added yet). A file
+    outside every repository, and everything when git fails, gets no
+    state. Keys are the normalized paths given in rels."""
+    roots = sorted({_norm_rel(g) for g in git_roots},
+                   key=lambda g: (-g.count('/'), g))
+    owners = {}
+    for rel in rels:
+        n = _norm_rel(rel)
+        for g in roots:
+            if g == '.' or n == g or n.startswith(g + '/'):
+                owners.setdefault(g, []).append(n if g == '.' else n[len(g) + 1:])
+                break
+    states = {}
+    for g, subs in owners.items():
+        repo = root if g == '.' else root / g
+        tracked = set()
+        failed = False
+        for chunk in _chunks(subs):
+            rc, out = run_git(repo, '-c', 'core.quotepath=false',
+                              'ls-files', '--', *chunk)
+            if rc != 0:
+                failed = True
+                break
+            tracked.update(_norm_rel(line.strip()) for line in out.splitlines()
+                           if line.strip())
+        if failed:
+            continue
+        ignored = _ignored_files(repo, [s for s in subs if s not in tracked])
+        prefix = '' if g == '.' else g + '/'
+        for s in subs:
+            states[prefix + s] = ('tracked' if s in tracked else
+                                  'ignored' if s in ignored else 'untracked')
+    return states
+
+
+def git_top_status(p):
+    """Top-level entries that git reports as a whole: 'untracked' (no
+    tracked file inside) and 'ignored' (kept out by .gitignore). An
+    entry in neither list holds tracked files. None when git fails."""
+    rc, out = run_git(p, '-c', 'core.quotepath=false',
+                      'status', '--porcelain', '--ignored')
+    if rc != 0:
+        return None
+    status = {'untracked': [], 'ignored': []}
+    for line in out.splitlines():
+        code, path = line[:2], line[3:].rstrip()
+        if code not in ('??', '!!') or not path:
+            continue
+        # a whole folder comes with its trailing slash and a file has
+        # no slash at all; 'dir/new.txt' means the folder also holds
+        # tracked files
+        if '/' in path.rstrip('/'):
+            continue
+        bucket = status['untracked' if code == '??' else 'ignored']
+        if path.rstrip('/') not in bucket:
+            bucket.append(path.rstrip('/'))
+    return status
+
+
 # --- blocks E and F: sync and secrets in git ------------------------------------
 
-def repo_extra(p, gi, deep=False, history_depth=None, history_all_refs=False):
+def repo_extra(p, gi, deep=False, history_depth=None, history_all_refs=False,
+               nested=True):
     ex = {'branch': None, 'ahead_behind': None, 'remote_class': None,
           'credentials_in_remote': False, 'gitignore': _exists(p / '.gitignore'),
           'hooks': [], 'sync_commits_last30': 0, 'tracked_secrets': [],
-          'nested_repos': nested_repos(p)}
+          'nested_repos': nested_repos(p) if nested else []}
+    # repositories inside this one that .gitignore keeps out: a layout
+    # the owner chose, not an accident
+    ex['nested_repos_ignored'] = sorted(_ignored_files(p, ex['nested_repos']))
     rc, out = run_git(p, 'branch', '--show-current')
     if rc == 0 and out.strip():
         ex['branch'] = out.strip()
@@ -233,16 +358,40 @@ def repo_extra(p, gi, deep=False, history_depth=None, history_all_refs=False):
     ex['sync_commits_last30'] = len([l for l in out.splitlines() if l.strip()])
 
     rc, out = run_git(p, 'grep', '--cached', '-i', '-nE', secscan.GIT_GREP_RE)
+    own = {}
     if rc == 0:
-        ex['tracked_secrets'] = secscan.scan_git_grep_output(out)[:10]
+        # the plugin's own source is in the index too when a copy of it
+        # is kept in the folder: same exclusion as in the worktree scan
+        ex['tracked_secrets'] = [
+            h for h in secscan.scan_git_grep_output(out)
+            if not _own_source_dir(_hit_dir(p, h), p, own)]
+        for h in ex['tracked_secrets']:
+            # the worktree scan does not read files of this size for
+            # keys (bundles and minified libraries live there): a hit
+            # from the index in such a file is "look by hand", not a key
+            try:
+                h['in_bundle'] = (p / str(h.get('file') or '')).stat().st_size \
+                    >= SECRET_FILE_MAX_BYTES
+            except OSError:
+                h['in_bundle'] = False
+        # a real key must not fall off the end behind library files
+        ex['tracked_secrets'].sort(key=lambda h: bool(h.get('in_bundle')))
+        del ex['tracked_secrets'][10:]
 
     if deep:
         hist = history_scan.scan_history(
             p, max_commits=history_depth, all_refs=history_all_refs,
             match_line=secscan.find_in_line)
-        ex['history_secrets'] = hist.pop('findings')
+        ex['history_secrets'] = [
+            h for h in hist.pop('findings')
+            if not _own_source_dir(_hit_dir(p, h), p, own)]
         ex['history_coverage'] = hist
     return ex
+
+
+def _hit_dir(repo, hit):
+    """Folder of a git hit (index or history), under the repo folder."""
+    return (Path(repo) / str(hit.get('file') or '')).parent
 
 
 # --- blocks A, B, C: harness, instructions, context tax -------------------------
@@ -387,6 +536,19 @@ def parse_skill(f):
             'path': str(f)}
 
 
+# SKILL.md files checked per skill folder. The plugin cache keeps every
+# installed version of every skill and can hold thousands; above the cap
+# the scan reports a truncated (unknown) check instead of a silent pass.
+SKILLS_FOLDER_CAP = 1000
+
+
+def _os_reason(exc):
+    """Why a folder could not be read, without the path: the system
+    message up to its first colon ('[WinError 5] Access is denied')."""
+    text = str(exc).split(':', 1)[0].strip()
+    return text or type(exc).__name__
+
+
 def skills_report(home, root):
     locs = [('user-zcode', home / '.zcode' / 'skills', 'one'),
             ('user-claude', home / '.claude' / 'skills', 'one'),
@@ -395,18 +557,30 @@ def skills_report(home, root):
             ('plugins-cache', home / '.zcode' / 'cli' / 'plugins' / 'cache', 'deep')]
     found = []
     checked = []
+    failed = []
+    truncated = []
     for loc, base, mode in locs:
         if not _exists(base):
             continue
+        try:
+            if mode == 'one':
+                paths = [child / 'SKILL.md' for child in sorted(base.iterdir())]
+                paths = [sk for sk in paths if sk.is_file()]
+            else:
+                paths = [sk for sk in sorted(base.rglob('SKILL.md')) if sk.is_file()]
+        except OSError as exc:
+            # exists, but cannot be listed (permissions, not a folder, ...):
+            # an unreadable folder is an unchecked check, never a crash and
+            # never an empty result
+            failed.append({'location': loc, 'reason': _os_reason(exc)})
+            continue
         checked.append(f'{loc}: {base}')
-        if mode == 'one':
-            for child in sorted(base.iterdir()):
-                sk = child / 'SKILL.md'
-                if sk.is_file():
-                    found.append((loc, sk))
-        else:
-            for sk in list(base.rglob('SKILL.md'))[:200]:
-                found.append((loc, sk))
+        if len(paths) > SKILLS_FOLDER_CAP:
+            truncated.append({'location': loc, 'scanned': SKILLS_FOLDER_CAP,
+                              'found': len(paths), 'cap': SKILLS_FOLDER_CAP})
+            paths = paths[:SKILLS_FOLDER_CAP]
+        for sk in paths:
+            found.append((loc, sk))
     entries = []
     for loc, f in found:
         e = parse_skill(f)
@@ -425,7 +599,12 @@ def skills_report(home, root):
             dups.append({'name': name, 'copies': len(es),
                          'sync': 'identical' if same else 'DIVERGED',
                          'paths': [e['path'] for e in es]})
-    return {'entries': entries, 'duplicates': dups, 'locations_checked': checked}
+    return {'entries': entries, 'duplicates': dups,
+            'locations_checked': checked,
+            # what the search actually covered: folders read, folders that
+            # exist but could not be read, folders cut by the cap
+            'coverage': {'checked': [line.split(':', 1)[0] for line in checked],
+                         'failed': failed, 'truncated': truncated}}
 
 
 # --- summary gates ---------------------------------------------------------------
@@ -534,7 +713,11 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
            'context_budget': [], 'chain_budget_over': False,
            'findings': [], 'rules_version': RULES_VERSION,
            'junk': {'files': [], 'dirs': [], 'empty_dirs': []},
-           'duplicates': [], 'large_files': [], 'secrets': [], 'gates': [], 'stats': {}}
+           'duplicates': [], 'large_files': [], 'secrets': [], 'gates': [],
+           'git_roots': [], 'stats': {}}
+    # every folder holding a .git, relative to root ('.' = the root itself);
+    # filled by the walk below
+    git_roots = rep['git_roots']
     per_top, total_files = {}, 0
     seen_secret_lines = set()
     skipped_links = 0
@@ -544,6 +727,10 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
     # the few files that need it (duplicate-size groups, secret candidates)
     size_groups = {}     # size -> [rel paths] (dedup candidates only)
     secret_candidates = []  # (rel, fn) files whose content may hide secrets
+    own_source = {}      # directory -> lies inside this plugin's source
+    # files that would have been read for keys but lie in a copy of this
+    # plugin's own source: counted so that the gap can be reported
+    own_source_skipped = 0
 
     def inside_root(target):
         return target == root or root in target.parents
@@ -579,6 +766,9 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
                     has_children = True
                     dn = ent.name
                     if dn == '.git':
+                        # the folder holding it is a git repository; record
+                        # it (top level or nested) and do not walk inside
+                        git_roots.append(str(Path(current).relative_to(root)))
                         continue
                     reason = (f'build artifact ({dn})' if dn in BUILD_DIRS
                               else dir_junk_reason(dn))
@@ -600,6 +790,10 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
                     except OSError:
                         continue
                     fn = ent.name
+                    if fn == '.git':
+                        # a .git file marks a repository too (worktrees,
+                        # submodules)
+                        git_roots.append(str(Path(current).relative_to(root)))
                     rel = str(Path(ent.path).relative_to(root))
                     top = rel.split(os.sep)[0]
                     per_top[top] = per_top.get(top, 0) + st.st_size
@@ -616,9 +810,12 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
                     if DUP_MIN_BYTES <= st.st_size <= DUP_MAX_BYTES:
                         size_groups.setdefault(st.st_size, []).append(rel)
                     if (fn in SECRET_FILENAMES or NAME_SECRET_RX.search(fn)
-                            or Path(fn).suffix.lower() in TEXT_EXTS) \
-                            and st.st_size < 1024 * 1024:
-                        secret_candidates.append((rel, fn))
+                        or Path(fn).suffix.lower() in TEXT_EXTS) \
+                        and st.st_size < SECRET_FILE_MAX_BYTES:
+                        if _own_source_dir(current, root, own_source):
+                            own_source_skipped += 1
+                        else:
+                            secret_candidates.append((rel, fn))
             except OSError:
                 # entry vanished between scandir and stat: skip it
                 continue
@@ -626,6 +823,9 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
             rep['junk']['empty_dirs'].append(
                 str(Path(current).relative_to(root)))
         stack.extend(reversed(subdirs))
+
+    # stable order: the walk visits folders in stack order
+    rep['git_roots'] = sorted(set(git_roots))
 
     # --- read-once, parallel content pass ------------------------------------
     # Duplicates and secrets share ONE open per file: the per-open tax on
@@ -642,6 +842,7 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
         p = root / rel
         head = None
         text = None
+        full_hash = None
         try:
             with p.open('rb') as fh:
                 if rel in dup_candidates:
@@ -657,21 +858,30 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
                 else:
                     data = None
         except OSError:
-            return rel, None, None
-        if data is not None and rel in secret_set:
-            text = data.decode('utf-8', errors='replace')
-        return rel, head, text
+            return rel, None, None, None
+        if data is not None:
+            # hashed over the bytes as read, never over re-encoded text
+            # (errors='replace' below changes bytes that were invalid UTF-8)
+            full_hash = hashlib.md5(data).hexdigest()
+            if rel in secret_set:
+                text = data.decode('utf-8', errors='replace')
+        return rel, head, text, full_hash
 
     from concurrent.futures import ThreadPoolExecutor
     head_by_rel = {}
     text_by_rel = {}
+    # files the shared pass already read in full: their whole-file hash is
+    # known and the second dedup stage must not open them again
+    full_hash_by_rel = {}
     with ThreadPoolExecutor(max_workers=8) as pool:
-        for rel, head, text in pool.map(_read_task,
-                                        sorted(dup_candidates | secret_set)):
+        for rel, head, text, full_hash in pool.map(_read_task,
+                                                   sorted(dup_candidates | secret_set)):
             if head is not None:
                 head_by_rel[rel] = head
             if text is not None:
                 text_by_rel[rel] = text
+            if full_hash is not None:
+                full_hash_by_rel[rel] = full_hash
 
     # duplicates: group by head hash, full-hash only surviving groups
     hashes = {}
@@ -689,11 +899,14 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
                 continue
             full = {}
             for rel in group:
-                p = root / rel
-                try:
-                    h = hashlib.md5(p.read_bytes()).hexdigest()
-                except OSError:
-                    continue
+                h = full_hash_by_rel.get(rel)
+                if h is None:
+                    # only the head was read (large or non-text candidate):
+                    # read the whole file now
+                    try:
+                        h = hashlib.md5((root / rel).read_bytes()).hexdigest()
+                    except OSError:
+                        continue
                 full.setdefault(h, []).append(rel)
             for h, paths in full.items():
                 if len(paths) > 1:
@@ -713,6 +926,20 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
                                    'mask': hit['mask'],
                                    'fingerprint': hit['fingerprint'],
                                    'confidence': hit['confidence']})
+
+    # where large files and files with keys sit in the nearest repository:
+    # tracked, ignored by .gitignore or not added yet
+    states = git_file_states(root, rep['git_roots'],
+                             [f['path'] for f in rep['large_files']]
+                             + [s['path'] for s in rep['secrets']])
+    for f in rep['large_files']:
+        state = states.get(_norm_rel(f['path']))
+        if state:
+            f['tracked'] = state == 'tracked'
+    for s in rep['secrets']:
+        state = states.get(_norm_rel(s['path']))
+        if state:
+            s['git'] = state
 
     prof['walk'] = time.monotonic() - _tp; _tp = time.monotonic()
     for h, paths in hashes.items():
@@ -748,6 +975,28 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
                                      'size_bytes': fsize})
     rep['dup_checkouts'] = {u: names for u, names in remotes.items() if len(names) > 1}
     prof['top_git'] = time.monotonic() - _tp; _tp = time.monotonic()
+
+    # the audited folder itself may be a repository. Its git side is read
+    # like that of any other one and listed first, under the name '.'
+    root_gi = git_info(root)
+    if root_gi:
+        root_ex = repo_extra(root, root_gi, deep, history_depth,
+                             history_all_refs, nested=False)
+        # the walk already found every repository: they all sit inside
+        # this one
+        root_ex['nested_repos'] = [g for g in rep['git_roots'] if g != '.']
+        root_ex['nested_repos_ignored'] = sorted(
+            _ignored_files(root, root_ex['nested_repos']))
+        # which top-level entries hold tracked files (see _g4)
+        root_ex['top_status'] = git_top_status(root)
+        # the tool writes its reports into .agents-doctor/: is that
+        # folder kept out of git? The path need not exist for git to say
+        rc, _out = run_git(root, 'check-ignore', '-q', '--',
+                           '.agents-doctor/scan.json')
+        root_ex['tool_dir_ignored'] = (True if rc == 0
+                                       else False if rc == 1 else None)
+        rep['top_level'].insert(0, {'name': '.', 'kind': 'repo', 'git': root_gi,
+                                    'extra': root_ex})
 
     proj_ctx_dirs = [e for e in sorted(root.iterdir())
                      if e.is_dir() and (_exists(e / 'AGENTS.md') or _exists(e / 'CLAUDE.md'))]
@@ -879,6 +1128,7 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
                     'total_size_bytes': sum(per_top.values()),
                     'skipped_symlinks_outside': skipped_links,
                     'skipped_symlink_names': link_skips,
+                    'own_source_skipped': own_source_skipped,
                     'duration_sec': round(time.monotonic() - t0, 2)}
     return rep
 

@@ -259,9 +259,14 @@ def diff_scans(conn, old_id, new_id):
 
 def _identity(f):
     """Cross-scan identity of a typed finding: adapter findings carry a
-    stable check_id (+ harness); the rest fall back to fid + gate."""
-    if f.get('check_id'):
-        return ('check', f['check_id'], f.get('harness') or '')
+    stable check_id (+ harness); the rest fall back to fid + gate.
+
+    Gate findings carry a check_id as well (it names the finding type),
+    so the check_id alone does not tell an adapter finding: the harness
+    field does. Keying gate findings by type would fold every finding of
+    one kind into a single row and skew diffs and trends."""
+    if f.get('check_id') and f.get('harness'):
+        return ('check', f['check_id'], f['harness'])
     return ('fid', f.get('gate') or '', f.get('fid') or '')
 
 

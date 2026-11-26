@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
-  "root": "X:\\Repos\\agents-doctor\\qa\\scenarios\\01-clean-newbie\\run\\workspace",
-  "home": "X:\\Repos\\agents-doctor\\qa\\scenarios\\01-clean-newbie\\run\\home",
-  "generated_at": "2026-11-16T16:21:26+03:00",
+  "root": "C:\\workspaces\\clean-demo\\workspace",
+  "home": "C:\\workspaces\\clean-demo\\home",
+  "generated_at": "2026-11-26T14:00:06+03:00",
   "top_level": [
     {
       "name": ".agents",
@@ -28,7 +28,8 @@
         "remote": "https://gitlab.example.com/infra/docs-vault.git",
         "last_commit": "2026-10-29T10:00:00+03:00",
         "dirty": [],
-        "untracked": []
+        "untracked": [],
+        "credentials_in_remote": false
       },
       "size_bytes": 139,
       "extra": {
@@ -40,7 +41,8 @@
         "hooks": [],
         "sync_commits_last30": 0,
         "tracked_secrets": [],
-        "nested_repos": []
+        "nested_repos": [],
+        "nested_repos_ignored": []
       }
     },
     {
@@ -60,6 +62,7 @@
   "context_files": [
     {
       "path": "AGENTS.md",
+      "origin": "project",
       "lines": 5,
       "size_bytes": 278,
       "is_pointer": false,
@@ -70,6 +73,7 @@
     },
     {
       "path": ".zcode\\AGENTS.md",
+      "origin": "home",
       "lines": 3,
       "size_bytes": 113,
       "is_pointer": false,
@@ -84,17 +88,17 @@
     "session_files": [
       {
         "role": "user-zcode",
-        "path": "X:\\Repos\\agents-doctor\\qa\\scenarios\\01-clean-newbie\\run\\home\\.zcode\\AGENTS.md",
+        "path": "C:\\workspaces\\clean-demo\\home\\.zcode\\AGENTS.md",
         "size_bytes": 117
       },
       {
         "role": "project",
-        "path": "X:\\Repos\\agents-doctor\\qa\\scenarios\\01-clean-newbie\\run\\workspace\\AGENTS.md",
+        "path": "C:\\workspaces\\clean-demo\\workspace\\AGENTS.md",
         "size_bytes": 284
       },
       {
         "role": "memory-index",
-        "path": "X:\\Repos\\agents-doctor\\qa\\scenarios\\01-clean-newbie\\run\\home\\.zcode\\cli\\memories\\projects\\demo\\memory\\MEMORY.md",
+        "path": "C:\\workspaces\\clean-demo\\home\\.zcode\\cli\\memories\\projects\\demo\\memory\\MEMORY.md",
         "size_bytes": 3478
       }
     ],
@@ -119,7 +123,7 @@
       },
       {
         "tool": "claude",
-        "path": "X:\\Repos\\agents-doctor\\qa\\scenarios\\01-clean-newbie\\run\\home\\.claude",
+        "path": "C:\\workspaces\\clean-demo\\home\\.claude",
         "exists": false,
         "reads": [
           "CLAUDE.md",
@@ -128,7 +132,7 @@
       },
       {
         "tool": "codex",
-        "path": "X:\\Repos\\agents-doctor\\qa\\scenarios\\01-clean-newbie\\run\\home\\.codex",
+        "path": "C:\\workspaces\\clean-demo\\home\\.codex",
         "exists": false,
         "reads": [
           "AGENTS.md"
@@ -162,14 +166,21 @@
         "desc_len": 74,
         "has_triggers": true,
         "md5": "7679a98958b683374d46339b79e538bc",
-        "path": "X:\\Repos\\agents-doctor\\qa\\scenarios\\01-clean-newbie\\run\\workspace\\.agents\\skills\\report-helper\\SKILL.md",
+        "path": "C:\\workspaces\\clean-demo\\workspace\\.agents\\skills\\report-helper\\SKILL.md",
         "location": "project-agents"
       }
     ],
     "duplicates": [],
     "locations_checked": [
-      "project-agents: X:\\Repos\\agents-doctor\\qa\\scenarios\\01-clean-newbie\\run\\workspace\\.agents\\skills"
-    ]
+      "project-agents: C:\\workspaces\\clean-demo\\workspace\\.agents\\skills"
+    ],
+    "coverage": {
+      "checked": [
+        "project-agents"
+      ],
+      "failed": [],
+      "truncated": []
+    }
   },
   "context_budget": [
     {
@@ -186,7 +197,7 @@
       "path": "incoming\\temp-notes.md"
     }
   ],
-  "rules_version": "0.4.0",
+  "rules_version": "3.1.0",
   "junk": {
     "files": [
       {
@@ -278,6 +289,10 @@
           "status": "pass"
         },
         {
+          "rule": "content-quality",
+          "status": "pass"
+        },
+        {
           "rule": "pair-drift",
           "status": "pass"
         },
@@ -294,6 +309,7 @@
         "instruction files checked: 2, dead references: 0",
         "generic markers: 0",
         "instruction files over benchmark: 0",
+        "files analyzed: 1, worst signal ratio: 0.40, generic phrases: 0, contradictions: 0, redundant pairs: 0",
         "drifted pairs: 0",
         "AGENTS.md chains within 32768 bytes"
       ],
@@ -388,6 +404,12 @@
           "status": "pass"
         },
         {
+          "rule": "history-coverage",
+          "status": "unknown",
+          "why": "history_not_scanned",
+          "reason": "Git history was not scanned for keys"
+        },
+        {
           "rule": "secret-prevention",
           "status": "warn"
         }
@@ -398,7 +420,8 @@
       "status": "warn",
       "evidence": [
         "secrets found in workspace files: 0",
-        "secret hits in git (index, remote URLs): 0",
+        "secret hits in git (index, remote URLs, history): 0",
+        "deep scan not requested: history unchecked (not a pass)",
         "secret scan hooks found: 0 (repositories scanned: 1)"
       ],
       "confidence": 0.85,
@@ -520,11 +543,52 @@
       "doc_ref": "README.md#limits-and-thresholds"
     }
   ],
+  "git_roots": [
+    "docs-vault"
+  ],
   "stats": {
+    "profile": {
+      "walk": 0.031,
+      "top_git": 0.141,
+      "context": 0.016,
+      "enrich": 0.031,
+      "gates": 0.0
+    },
     "total_files": 9,
     "total_size_bytes": 929,
     "skipped_symlinks_outside": 0,
-    "duration_sec": 0.19
+    "skipped_symlink_names": [],
+    "own_source_skipped": 0,
+    "duration_sec": 0.22
+  },
+  "content_quality": {
+    "AGENTS.md": {
+      "filepath": "AGENTS.md",
+      "size_bytes": 278,
+      "total_lines": 6,
+      "non_blank_lines": 5,
+      "signal_lines": 2,
+      "noise_lines": 3,
+      "signal_ratio": 0.4,
+      "generic_phrases": [],
+      "generic_count": 0,
+      "unique_rules": 2,
+      "instruction_density": 7.367,
+      "redundant_pairs": [],
+      "redundant_total": 0,
+      "contradictions": [],
+      "specificity": 1.0,
+      "vague_instructions": [],
+      "vague_count": 0,
+      "obsolete_hints": [],
+      "obsolete_count": 0,
+      "overlong_lines": [],
+      "overlong_count": 0,
+      "staleness_hint": {
+        "computable": false,
+        "reason": "requires git history"
+      }
+    }
   },
   "config_integrity": [],
   "heavy_outside_git": [],
@@ -549,9 +613,341 @@
     "report-helper": {
       "frontmatter_ok": true,
       "missing_fields": [],
+      "fields_checked": true,
+      "parse_error": null,
       "dead_refs": [],
-      "parser": "yaml"
+      "parser": "yaml",
+      "path": "C:\\workspaces\\clean-demo\\workspace\\.agents\\skills\\report-helper\\SKILL.md"
     }
+  },
+  "harnesses": [
+    {
+      "harness": "zcode",
+      "status": "detected",
+      "confidence": "high",
+      "activity": "active",
+      "version": null,
+      "markers": [
+        ".agents",
+        "AGENTS.md"
+      ],
+      "evidence": [
+        "project markers: .agents, AGENTS.md; recent activity (<=30d)"
+      ]
+    },
+    {
+      "harness": "claude_code",
+      "status": "not_found",
+      "confidence": "low",
+      "activity": "unknown",
+      "version": null,
+      "markers": [],
+      "evidence": [
+        "no markers found"
+      ]
+    },
+    {
+      "harness": "codex",
+      "status": "detected",
+      "confidence": "medium",
+      "activity": "unknown",
+      "version": null,
+      "markers": [
+        "AGENTS.md",
+        ".agents"
+      ],
+      "evidence": [
+        "project markers: AGENTS.md, .agents; activity unknown"
+      ]
+    },
+    {
+      "harness": "cursor",
+      "status": "not_found",
+      "confidence": "low",
+      "activity": "unknown",
+      "version": null,
+      "markers": [],
+      "evidence": [
+        "no markers found"
+      ]
+    },
+    {
+      "harness": "gemini_cli",
+      "status": "not_found",
+      "confidence": "low",
+      "activity": "unknown",
+      "version": null,
+      "markers": [],
+      "evidence": [
+        "no markers found"
+      ]
+    },
+    {
+      "harness": "opencode",
+      "status": "detected",
+      "confidence": "medium",
+      "activity": "unknown",
+      "version": null,
+      "markers": [
+        "AGENTS.md"
+      ],
+      "evidence": [
+        "project markers: AGENTS.md; activity unknown"
+      ]
+    },
+    {
+      "harness": "github_copilot",
+      "status": "not_found",
+      "confidence": "low",
+      "activity": "unknown",
+      "version": null,
+      "markers": [],
+      "evidence": [
+        "no markers found"
+      ]
+    },
+    {
+      "harness": "windsurf",
+      "status": "not_found",
+      "confidence": "low",
+      "activity": "unknown",
+      "version": null,
+      "markers": [],
+      "evidence": [
+        "no markers found"
+      ]
+    }
+  ],
+  "harness_spec_matrix": [
+    {
+      "harness_id": "zcode",
+      "display_name": "Z Code",
+      "adapter_version": "1.0.0",
+      "spec_source": "",
+      "spec_verified": "2026-11-17",
+      "supported_versions": "current CLI (version not detectable offline)",
+      "known_limitations": [
+        "nested AGENTS.md merging not modelled; only user + project root"
+      ],
+      "capability_status": {
+        "detection": "documented",
+        "user_settings": "documented",
+        "instruction_hierarchy": "approximated",
+        "loading_order": "approximated",
+        "imports": "unsupported",
+        "glob_matching": "unsupported",
+        "nested_instructions": "unsupported",
+        "skills": "documented",
+        "mcp": "documented",
+        "permissions": "unknown",
+        "context_budget": "documented",
+        "version_detect": "unknown",
+        "spec_freshness": "documented"
+      }
+    },
+    {
+      "harness_id": "claude_code",
+      "display_name": "Claude Code",
+      "adapter_version": "1.0.0",
+      "spec_source": "https://docs.anthropic.com/en/docs/claude-code",
+      "spec_verified": "2026-11-17",
+      "supported_versions": "2.x (loading model, unverified against runtime)",
+      "known_limitations": [
+        "subdirectory CLAUDE.md lazy loading modelled as path-based inclusion: a nested file is active only when the target directory lies inside its subtree",
+        "enterprise managed policies not modelled (no offline source)",
+        "AGENTS.md support depends on version >= 2.1.296; when both CLAUDE.md and AGENTS.md exist, both are reported as project sources",
+        "no documented instruction context budget"
+      ],
+      "capability_status": {
+        "detection": "documented",
+        "user_settings": "documented",
+        "instruction_hierarchy": "approximated",
+        "loading_order": "approximated",
+        "imports": "approximated",
+        "glob_matching": "approximated",
+        "nested_instructions": "approximated",
+        "skills": "documented",
+        "mcp": "documented",
+        "permissions": "documented",
+        "context_budget": "unsupported",
+        "version_detect": "unsupported",
+        "spec_freshness": "documented"
+      }
+    },
+    {
+      "harness_id": "codex",
+      "display_name": "OpenAI Codex",
+      "adapter_version": "1.0.0",
+      "spec_source": "https://developers.openai.com/codex",
+      "spec_verified": "2026-11-17",
+      "supported_versions": "current CLI (unverified)",
+      "known_limitations": [
+        "AGENTS.md merge order modelled as documented, not runtime-verified",
+        "project .codex/config.toml support varies by version"
+      ],
+      "capability_status": {
+        "detection": "documented",
+        "user_settings": "documented",
+        "instruction_hierarchy": "documented",
+        "loading_order": "documented",
+        "imports": "unsupported",
+        "glob_matching": "unsupported",
+        "nested_instructions": "approximated",
+        "skills": "unknown",
+        "mcp": "documented",
+        "permissions": "documented",
+        "context_budget": "approximated",
+        "version_detect": "approximated",
+        "spec_freshness": "documented"
+      }
+    },
+    {
+      "harness_id": "cursor",
+      "display_name": "Cursor",
+      "adapter_version": "1.0.0",
+      "spec_source": "https://docs.cursor.com/context/rules",
+      "spec_verified": "2026-11-17",
+      "supported_versions": "current (unverified)",
+      "known_limitations": [
+        "glob semantics approximated with fnmatch + dir-prefix; nested .mdc referencing not modelled"
+      ],
+      "capability_status": {
+        "detection": "documented",
+        "user_settings": "unsupported",
+        "instruction_hierarchy": "documented",
+        "loading_order": "approximated",
+        "imports": "unsupported",
+        "glob_matching": "approximated",
+        "nested_instructions": "unsupported",
+        "skills": "unsupported",
+        "mcp": "documented",
+        "permissions": "unknown",
+        "context_budget": "unknown",
+        "version_detect": "unsupported",
+        "spec_freshness": "documented"
+      }
+    },
+    {
+      "harness_id": "gemini_cli",
+      "display_name": "Gemini CLI",
+      "adapter_version": "1.0.0",
+      "spec_source": "https://docs.gemini-cli / https://github.com/google-gemini/gemini-cli",
+      "spec_verified": "2026-11-17",
+      "supported_versions": "current (unverified)",
+      "known_limitations": [
+        "hierarchical GEMINI.md loading modelled as documented, not runtime-verified",
+        "AI memories under ~/.gemini/tmp/<hash>/memories/ are not modelled",
+        "import depth limit of 5 hops taken from documentation",
+        "@import token extraction approximated with a regex; fenced code blocks are not excluded"
+      ],
+      "capability_status": {
+        "detection": "documented",
+        "user_settings": "documented",
+        "instruction_hierarchy": "approximated",
+        "loading_order": "documented",
+        "imports": "approximated",
+        "glob_matching": "unsupported",
+        "nested_instructions": "documented",
+        "skills": "documented",
+        "mcp": "documented",
+        "permissions": "unknown",
+        "context_budget": "unknown",
+        "version_detect": "unsupported",
+        "spec_freshness": "documented"
+      }
+    },
+    {
+      "harness_id": "opencode",
+      "display_name": "OpenCode",
+      "adapter_version": "1.0.0",
+      "spec_source": "https://opencode.ai/docs/config/",
+      "spec_verified": "2026-11-17",
+      "supported_versions": "current (unverified)",
+      "known_limitations": [
+        "jsonc comment stripping is heuristic (string-aware // line comments only; /* */ block comments are not handled)",
+        "AGENTS.md merge order and the `instruction` file precedence are modelled from the docs, not runtime-verified"
+      ],
+      "capability_status": {
+        "detection": "documented",
+        "user_settings": "documented",
+        "instruction_hierarchy": "documented",
+        "loading_order": "approximated",
+        "imports": "unsupported",
+        "glob_matching": "unsupported",
+        "nested_instructions": "documented",
+        "skills": "documented",
+        "mcp": "approximated",
+        "permissions": "documented",
+        "context_budget": "unknown",
+        "version_detect": "unsupported",
+        "spec_freshness": "documented"
+      }
+    },
+    {
+      "harness_id": "github_copilot",
+      "display_name": "GitHub Copilot",
+      "adapter_version": "1.0.0",
+      "spec_source": "https://docs.github.com/en/copilot",
+      "spec_verified": "2026-11-17",
+      "supported_versions": "current (unverified)",
+      "known_limitations": [
+        "global instructions live in editor settings, not the repo; they cannot be detected or validated offline",
+        "YAML mcp config validated heuristically (no top-level key check only, no full YAML parse)"
+      ],
+      "capability_status": {
+        "detection": "documented",
+        "user_settings": "unknown",
+        "instruction_hierarchy": "documented",
+        "loading_order": "approximated",
+        "imports": "unsupported",
+        "glob_matching": "approximated",
+        "nested_instructions": "unsupported",
+        "skills": "documented",
+        "mcp": "approximated",
+        "permissions": "unsupported",
+        "context_budget": "approximated",
+        "version_detect": "unsupported",
+        "spec_freshness": "documented"
+      }
+    },
+    {
+      "harness_id": "windsurf",
+      "display_name": "Windsurf",
+      "adapter_version": "1.0.0",
+      "spec_source": "https://docs.windsurf.com/windsurf/cascade/rules",
+      "spec_verified": "2026-11-17",
+      "supported_versions": "current (unverified)",
+      "known_limitations": [
+        "memories and workflows internals not modelled",
+        "glob semantics approximated with fnmatch + dir-prefix"
+      ],
+      "capability_status": {
+        "detection": "documented",
+        "user_settings": "unsupported",
+        "instruction_hierarchy": "documented",
+        "loading_order": "approximated",
+        "imports": "unsupported",
+        "glob_matching": "approximated",
+        "nested_instructions": "unsupported",
+        "skills": "unsupported",
+        "mcp": "documented",
+        "permissions": "unsupported",
+        "context_budget": "unknown",
+        "version_detect": "unsupported",
+        "spec_freshness": "documented"
+      }
+    }
+  ],
+  "instruction_conflict_summary": {
+    "contradiction": 0,
+    "duplication": 0,
+    "divergence": 0
+  },
+  "harness_findings_raw": [],
+  "mcp_inventory": {
+    "servers": [],
+    "files_scanned": [],
+    "parse_errors": []
   },
   "findings_detailed": [
     {
@@ -570,7 +966,8 @@
       ],
       "confidence": 0.9,
       "recommendation": "If the workspace should have configs (MCP, harness settings), find out why none were discovered.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "CFG_NO_CONFIG_FILES"
     },
     {
       "schema_version": "1.0",
@@ -601,7 +998,8 @@
       ],
       "confidence": 0.9,
       "recommendation": "Decide for each folder: make it a repo, move it into one, or remove it.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "DIR_LOOSE_TOP_FOLDERS"
     },
     {
       "schema_version": "1.0",
@@ -620,7 +1018,8 @@
       ],
       "confidence": 0.85,
       "recommendation": "Install a pre-commit secret scan (gitleaks or equivalent) in every active repository.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "SEC_PREVENTION_ABSENT"
     },
     {
       "schema_version": "1.0",
@@ -641,7 +1040,8 @@
       ],
       "confidence": 0.5,
       "recommendation": "Review, then archive or delete.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "HLTH_UNUSED_DATA"
     }
   ]
 }

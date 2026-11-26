@@ -1,6 +1,6 @@
 {
-  "description": "Drifted AGENTS.md/CLAUDE.md pair with dead commands and links.",
-  "gates": {"1": "fail", "2": "warn", "3": "fail", "4": "pass", "5": "pass", "6": "warn", "7": "warn", "8": "pass", "9": "pass"},
+  "description": "Drifted AGENTS.md/CLAUDE.md pair with dead commands and links. No skills in the fixture: G5 is not applicable (an empty skill search is never a pass).",
+  "gates": {"1": "fail", "2": "warn", "3": "fail", "4": "pass", "5": "not_applicable", "6": "warn", "7": "warn", "8": "pass", "9": "pass"},
   "counts": {"secrets": 0, "junk_files": 0, "junk_dirs": 0, "empty_dirs": 0, "duplicates": 0, "large_files": 0, "context_drift": 1, "dup_checkouts": 0},
   "findings_schema": true
 }

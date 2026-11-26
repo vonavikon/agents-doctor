@@ -2,18 +2,26 @@
 
 Runs the generator over the chaos fixture and over synthetic minimal
 reports: overall status logic, section order, table row counts, secret
-mask discipline and the baseline comparison block. Python 3.9+.
+mask discipline and the baseline comparison block. The technical report
+is also rendered over a scan of the stand workspace
+(tests/integration/fixtures.py), to check what it says about a check
+that did not run and what it prints for each finding. Python 3.9+.
 """
+import copy
 import json
 import re
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / 'skills' / 'agents-doctor' / 'scripts'))
+sys.path.insert(0, str(REPO / 'tests' / 'integration'))
 
+import audit_scan  # noqa: E402
 import report_generator
+from fixtures import stand  # noqa: E402
 
 CHAOS = REPO / 'llm-eval' / 'fixtures' / 'chaos.json'
 
@@ -122,7 +130,8 @@ class ChaosMarkdownTest(unittest.TestCase):
         head = meta[0]
         self.assertIn(self.rep['generated_at'], head)
         self.assertIn('schema 1.0', head)
-        self.assertIn('rules 0.4.0', head)
+        # the rules version comes from the fixture, not from a literal
+        self.assertIn('rules %s' % self.rep['rules_version'], head)
         self.assertIn('18 files', head)
 
     def test_executive_summary_mentions_status_and_top_finding(self):
@@ -242,6 +251,76 @@ class CliTest(unittest.TestCase):
             md = out.read_text(encoding='utf-8')
             self.assertIn('# Agents Doctor', md)
             self.assertIn('## Executive Summary', md)
+
+
+class TechnicalReportTests(unittest.TestCase):
+    """The technical report over a scan of the stand workspace."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.base = Path(cls._tmp.name)
+        cls.root = cls.base / 'ws'
+        cls.home = cls.base / 'home'
+        cls.root.mkdir()
+        cls.home.mkdir()
+        stand(cls.root, cls.home)
+        cls.rep = audit_scan.scan(cls.root, cls.home, False)
+        cls.key = next(f for f in cls.rep['findings_detailed']
+                       if f['gate'] == 'G6' and f['status'] == 'fail')
+        cls.key_at = '.mcp.json:%d' % cls.key['evidence'][0]['line']
+        cls.md = report_generator.generate_markdown(cls.rep)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def _section(self, header):
+        """Non-empty lines of one '## ' section, without the header."""
+        lines = self.md.splitlines()
+        start = lines.index(header)
+        out = []
+        for line in lines[start + 1:]:
+            if line.startswith('## ') or line.startswith('# '):
+                break
+            if line.strip():
+                out.append(line)
+        return out
+
+    def test_not_checked_gates_say_why(self):
+        table = self._section('## Gate Results')
+        g7 = [l for l in table if l.startswith('| G7 |')][0]
+        self.assertIn('not_applicable', g7)
+        self.assertIn('No git repositories in the audited area', g7)
+
+    def test_findings_table_has_location_and_what_to_do(self):
+        table = self._section('## All Findings')
+        self.assertIn('| location | what to do |', table[0])
+        key = [l for l in table if l.startswith('| %s |' % self.key['fid'])][0]
+        self.assertIn('| %s |' % self.key_at, key)
+        self.assertIn('Rotate the secret at its provider', key)
+        self.assertNotIn(str(self.base), key)
+
+    def test_actions_start_with_the_key_and_its_place(self):
+        actions = self._section('## Recommended Actions')
+        numbered = [l for l in actions if re.match(r'^\d+\. \[', l)]
+        self.assertTrue(numbered)
+        self.assertTrue(numbered[0].startswith(
+            '1. [%s]: %s: ' % (self.key['fid'], self.key_at)), numbered[0])
+        # gate advice does not repeat what its findings already say,
+        # and never asks for a hook in a folder without git
+        self.assertNotIn('add a pre-commit secret scan', '\n'.join(actions))
+
+    def test_planned_fixes_are_offered(self):
+        rep = copy.deepcopy(self.rep)
+        fixable = next(f for f in rep['findings_detailed']
+                       if f.get('status') == 'warn')
+        fixable['autofix_available'] = True
+        lines = report_generator.generate_markdown(rep).splitlines()
+        start = lines.index('## Recommended Actions')
+        actions = '\n'.join(lines[start + 1:])
+        self.assertIn('A planned fix exists for %s' % fixable['fid'], actions)
+        self.assertIn('ask for `fix <fid>`', actions)
 
 
 if __name__ == '__main__':

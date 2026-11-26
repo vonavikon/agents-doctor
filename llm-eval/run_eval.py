@@ -5,35 +5,37 @@
     python llm-eval/run_eval.py --model my-model --api https://api.example.com/v1 \
         --key-env OPENAI_API_KEY --out runs/my-model/
 
-Pipeline per fixture: build the prompt exactly as the skill would give it
-(make_report_prompt), get a report - from the model (any OpenAI-compatible
-/chat/completions endpoint via urllib), from a pre-baked/replayed report
-(--pregenerated), or from the shipped samples (offline mode) - then grade it
-deterministically with grade_report.py's checks (R1-R12 + RX) and write a
-verdict.json per report plus a combined summary.md and report.json.
+Pipeline per fixture: build the prompt exactly as the agent gets it in
+the skill (make_report_prompt: the user's request, the SKILL.md
+instructions and the digest the audit command prints), get the chat
+answer - from the model (any OpenAI-compatible /chat/completions endpoint
+via urllib), from a pre-written/replayed answer (--pregenerated), or from
+the shipped samples (offline mode) - then grade it deterministically with
+grade_answer.py's checks (A1-A12) and write a verdict.json per answer
+plus a combined summary.md and report.json.
 
 Modes:
   offline (default, --model offline): no network at all. Grades the shipped
-      sample reports (llm-eval/samples: good-chaos, bad-chaos, good-clean),
+      sample answers (llm-eval/samples: good-chaos, bad-chaos, good-clean),
       builds the adversarial fixtures locally and checks INPUT_VALIDATION on
       the malformed one. This is the CI contract: exit 0 iff every 'good'
-      sample passes all critical checks (R1, R2, R3, R7) with >= 6 of 7
-      rubric checks passing, every 'bad' sample is caught (a critical fails,
-      <= 3 of 7 pass), and the malformed fixture is rejected.
+      sample passes all critical checks (A1, A2, A3, A6, A7, A8) with >= 6
+      of 7 rubric checks passing, every 'bad' sample is caught (a critical
+      fails, <= 3 of 7 pass), and the malformed fixture is rejected.
   online (--api <base-url> --model <name>): calls <api>/chat/completions with
       a Bearer key from the env var named by --key-env (default
       OPENAI_API_KEY), 120 s timeout, one retry. Model runs are opt-in only:
       without a non-empty key in the named env var the runner prints an
       'opt-in only' error and exits 2 before touching the network. Exit 0
-      iff all critical checks pass on the generated reports and
+      iff all critical checks pass on the generated answers and
       INPUT_VALIDATION holds.
-  replay (--pregenerated <dir>, no --api): grades existing reports instead of
-      calling a model. File name convention per fixture stem S: good-S.md (or
-      S.md) is expected to pass, bad-S.md is expected to fail - both are
-      graded when both exist.
+  replay (--pregenerated <dir>, no --api): grades existing answers instead
+      of calling a model. File name convention per fixture stem S: good-S.md
+      (or S.md) is expected to pass, bad-S.md is expected to fail - both
+      are graded when both exist.
 
 Artifacts land in --out (default llm-eval/runs/<timestamp>-<model>/): one
-directory per graded report with verdict.json, report.md and prompt.txt, the
+directory per graded answer with verdict.json, report.md and prompt.txt, the
 raw model response (response.json, online mode), the generated adversarial
 fixtures under fixtures/, summary.md, and a run-level report.json split into
 deterministic (scanner-side facts: verdicts, aggregated checks, matrix entry)
@@ -41,10 +43,11 @@ and llm_interpretation (the model layer: model id, api base, prompt version,
 latency, token usage, harness='none'; null with an explanation when no model
 was called). Every run also appends an entry to the benchmark matrix
 (--matrix, default llm-eval/results/matrix.json): {model, mode,
-prompt_version, harness, ts, scores R1-R12, latency_ms, tokens, fid_mentions,
-result}. On a repeat online run of the same model and prompt version, R12
-(reproducibility) is graded as the jaccard of fid mentions against the
-previous run (pass >= 0.8). Python 3.9+, stdlib only.
+prompt_version, harness, ts, scores A1-A12, latency_ms, tokens,
+spot_mentions, result}. On a repeat online run of the same model and prompt
+version, A12 (reproducibility) is graded as the jaccard of the findings
+whose place the answer names against the previous run (pass >= 0.8).
+Python 3.9+, stdlib only.
 """
 import argparse
 import importlib.util
@@ -63,16 +66,18 @@ SKILL_MD = REPO / 'skills' / 'agents-doctor' / 'SKILL.md'
 DEFAULT_SAMPLES = HERE / 'samples'
 DEFAULT_FIXTURES = [HERE / 'fixtures' / 'clean.json',
                     HERE / 'fixtures' / 'chaos.json']
-CRITICAL_CHECKS = ('R1', 'R2', 'R3', 'R7')
-RUBRIC_CHECKS = ('R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7')
-ALL_CHECKS = tuple(f'R{i}' for i in range(1, 13))  # R1-R12
+CRITICAL_CHECKS = ('A1', 'A2', 'A3', 'A6', 'A7', 'A8')
+RUBRIC_CHECKS = ('A1', 'A2', 'A3', 'A4', 'A5', 'A9', 'A10')
+ALL_CHECKS = tuple(f'A{i}' for i in range(1, 13))  # A1-A12
+# the language of the user request the model answers in
+ANSWER_LANG = 'ru'
 TIMEOUT_S = 120
 
 # Bump when skills/agents-doctor/SKILL.md (Workflow/Rules) or the prompt
-# built by make_report_prompt.py changes shape: the benchmark matrix and R12
+# built by make_report_prompt.py changes shape: the benchmark matrix and A12
 # comparisons key off it, so a prompt change must not silently mix with old
 # runs of the "same" prompt.
-PROMPT_VERSION = '2026-11-18'
+PROMPT_VERSION = '2026-11-25'
 
 DEFAULT_MATRIX = HERE / 'results' / 'matrix.json'
 
@@ -85,6 +90,7 @@ def _load(name):
 
 
 grade_report = _load('grade_report')
+grade_answer = _load('grade_answer')
 make_report_prompt = _load('make_report_prompt')
 adversarial = _load('adversarial')
 
@@ -189,7 +195,7 @@ def append_matrix(path, entry):
 
 
 def aggregate_scores(verdicts):
-    """Worst-case R1-R12 status across the run's verdicts."""
+    """Worst-case A1-A12 status across the run's verdicts."""
     scores = {}
     for rid in ALL_CHECKS:
         statuses = [v['checks'].get(rid, {}).get('status', 'na')
@@ -212,8 +218,8 @@ def _sum_usage(metas):
     return total or None
 
 
-def compute_r12(current_fids, matrix_entries, model, prompt_version):
-    """R12 vs the latest previous online run of the same model+prompt.
+def compute_r12(current_spots, matrix_entries, model, prompt_version):
+    """A12 vs the latest previous online run of the same model+prompt.
 
     Returns None when there is nothing to compare with yet (status stays NA).
     """
@@ -224,25 +230,30 @@ def compute_r12(current_fids, matrix_entries, model, prompt_version):
     if not prevs:
         return None
     prev = prevs[-1]
-    j = grade_report.jaccard(current_fids, prev.get('fid_mentions') or [])
-    status = 'pass' if j >= grade_report.R12_JACCARD_MIN else 'fail'
+    j = grade_report.jaccard(current_spots, prev.get('spot_mentions') or [])
+    status = 'pass' if j >= grade_answer.A12_JACCARD_MIN else 'fail'
     return {'status': status,
-            'evidence': f'fid-mention jaccard {j:.2f} vs run '
+            'evidence': f'finding-mention jaccard {j:.2f} vs run '
                         f'{prev.get("ts", "?")} (threshold '
-                        f'{grade_report.R12_JACCARD_MIN})'}
+                        f'{grade_answer.A12_JACCARD_MIN})'}
 
 
 def grade_report_into_verdict(fixture, scan, report_text, report_source,
                               model, expect, sample_based, model_meta=None,
-                              r12=None):
-    results = grade_report.grade_extended(report_text, scan)
+                              r12=None, digest=None):
+    """Grade one chat answer against its scan and digest."""
+    if digest is None:
+        digest = grade_answer.digest_of(scan, ANSWER_LANG)
+    results = grade_answer.grade(report_text, scan, digest, ANSWER_LANG)
     checks = _checks_dict(results)
     if r12 is not None:
-        checks['R12'] = r12
+        checks['A12'] = r12
     checks['INPUT_VALIDATION'] = {
         'status': 'na', 'evidence': 'scan passed input validation'}
+    # a check the scan makes not applicable did not fail: it counts
+    # with the passes (a clean folder has no critical finding to name)
     rubric_passes = sum(1 for r in RUBRIC_CHECKS
-                        if checks[r]['status'] == 'pass')
+                        if checks[r]['status'] in ('pass', 'na'))
     critical_ok = all(checks[c]['status'] in ('pass', 'na')
                       for c in CRITICAL_CHECKS)
     verdict = {
@@ -294,7 +305,7 @@ def check_input_validation(malformed_path, out_root, model):
     checks = {
         rid: {'status': 'na',
               'evidence': 'not graded: input rejected before grading'}
-        for rid in list(ALL_CHECKS) + ['RX']
+        for rid in list(ALL_CHECKS)
     }
     checks['INPUT_VALIDATION'] = {'status': status, 'evidence': evidence}
     verdict = {
@@ -321,13 +332,13 @@ def check_input_validation(malformed_path, out_root, model):
 
 
 def write_summary(out_root, model, mode, verdicts):
-    cols = list(ALL_CHECKS) + ['RX', 'INPUT']
+    cols = list(ALL_CHECKS) + ['INPUT']
     lines = [
         f'# LLM eval summary',
         '',
         f'model: {model} | mode: {mode} | ran: {datetime.now().isoformat(timespec="seconds")}',
         '',
-        '| fixture | report | ' + ' | '.join(cols) + ' | R-pass | expect | ok |',
+        '| fixture | answer | ' + ' | '.join(cols) + ' | A-pass | expect | ok |',
         '|---|---|' + '---|' * (len(cols) + 3),
     ]
     for v in verdicts:
@@ -336,6 +347,7 @@ def write_summary(out_root, model, mode, verdicts):
             key = 'INPUT_VALIDATION' if c == 'INPUT' else c
             cells.append(v['checks'].get(key, {}).get('status', '-'))
         report = Path(v['report']).name if v['report'] else '-'
+        report = 'chat answer' if 'api' in report else report
         if v['expect'] == 'good':
             ok = v['critical_ok'] and (not v['sample_based']
                                        or v['rubric_passes'] >= 6)
@@ -432,7 +444,7 @@ def run(argv=None):
             # a model test: record rejection, do not call the model.
             checks = {rid: {'status': 'na',
                             'evidence': 'not graded: input rejected'}
-                      for rid in list(ALL_CHECKS) + ['RX']}
+                      for rid in list(ALL_CHECKS)}
             checks['INPUT_VALIDATION'] = {
                 'status': 'pass',
                 'evidence': 'invalid report input: ' + '; '.join(problems[:3])}
@@ -462,7 +474,10 @@ def run(argv=None):
             print(f'{stem}: rejected as invalid input (INPUT_VALIDATION pass)')
             continue
 
-        prompt = make_report_prompt.build_prompt(fixture, SKILL_MD)
+        prompt = make_report_prompt.build_prompt(fixture, SKILL_MD,
+                                                 ANSWER_LANG)
+        _scan, digest, _digest_text = make_report_prompt.build_digest(
+            fixture, ANSWER_LANG)
         reports = []  # (tag, source, text, sample_based, raw_payload)
 
         if sample_dir is not None:
@@ -484,17 +499,20 @@ def run(argv=None):
         for tag, source, text, sample_based, raw in reports:
             model_meta, r12 = None, None
             if online and not sample_based and stem in online_meta:
-                cur_fids = grade_report.fid_mentions(text)
-                r12 = compute_r12(cur_fids, matrix_entries, a.model,
+                cur_spots = grade_answer.spot_mentions(
+                text, scan, make_report_prompt.build_digest(
+                    fixture, ANSWER_LANG)[1])
+                r12 = compute_r12(cur_spots, matrix_entries, a.model,
                                   PROMPT_VERSION)
                 model_meta = dict(online_meta[stem],
                                   model=a.model, api_base=a.api,
                                   prompt_version=PROMPT_VERSION,
                                   harness='none',
-                                  fid_mentions=sorted(cur_fids))
+                                  spot_mentions=sorted(cur_spots))
             v = grade_report_into_verdict(fixture, scan, text, source,
                                           a.model, tag, sample_based,
-                                          model_meta=model_meta, r12=r12)
+                                          model_meta=model_meta, r12=r12,
+                                          digest=digest)
             suffix = '' if len(reports) == 1 else f'-{tag}'
             vdir = write_verdict(out_root, f'{stem}{suffix}', v, text,
                                  prompt, raw)
@@ -505,8 +523,8 @@ def run(argv=None):
                     'report_path': str(vdir / 'report.md'),
                     'prompt_path': str(vdir / 'prompt.txt'),
                     'latency_ms': model_meta['latency_ms'],
-                    'fid_mentions': model_meta['fid_mentions'],
-                    'R12': v['checks']['R12'],
+                    'spot_mentions': model_meta['spot_mentions'],
+                    'A12': v['checks']['A12'],
                 })
             crit = ', '.join(
                 f"{c}={v['checks'][c]['status']}" for c in CRITICAL_CHECKS)
@@ -531,8 +549,8 @@ def run(argv=None):
         'latency_ms': (round(sum(m['latency_ms'] for m in gen_metas), 1)
                        if gen_metas else None),
         'tokens': _sum_usage(gen_metas) if gen_metas else None,
-        'fid_mentions': (sorted(set().union(*(
-            r['fid_mentions'] for r in interp_reports)))
+        'spot_mentions': (sorted(set().union(*(
+            r['spot_mentions'] for r in interp_reports)))
             if interp_reports else []),
         'result': result,
     }

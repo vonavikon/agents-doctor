@@ -33,7 +33,7 @@ What the LLM never sees:
 Two layers, three planes:
 
 1. A deterministic scanner, `audit_scan.py`: pure Python stdlib, no dependencies, offline, about 0.5 s on a mid-size folder on a warm cache. It walks the workspace and writes JSON.
-2. The skill orchestrator: reads the JSON, filters false positives, and writes `AUDIT-<date>.md` with a gates table and cleanup commands.
+2. The skill orchestrator: runs one audit command and reads the short digest it prints (gate statuses with reasons, the findings that matter with their file and line, where to start). It never opens the scan JSON and writes the chat answer in plain words, in the user's language. The reports are written by the tool itself: a plain-language report for people and a technical one.
 
 Inside the deterministic layer:
 
@@ -147,21 +147,29 @@ All tokens and hosts in the fixtures are synthetic.
 
 ## Report and exports
 
-The skill writes `AUDIT-<date>.md`: executive summary, overall status (`FAIL` / `NEEDS ATTENTION` / `PASS`), gate results, findings by severity and recommended actions. A sample for a messy workspace: [docs/sample-report.md](docs/sample-report.md). The generators are deterministic and need no model:
+One command scans the folder, leaves three files in `<root>/.agents-doctor/` and prints the short digest:
+
+```
+python skills/agents-doctor/scripts/agents_doctor.py audit <root> --out <root>/.agents-doctor/scan.json \
+    --report <root>/.agents-doctor/AUDIT.md --human <root>/.agents-doctor/REPORT.md --lang ru --summary
+```
+
+| File | For whom | What it holds |
+|---|---|---|
+| `REPORT.md` | people who do not work with code | what is wrong in plain words (file, line, what to do), what can be made better, where to start; Russian or English |
+| `AUDIT.md` | engineers | executive summary, gate results with the reason wherever a check did not run, every finding with its location and what to do, recommended actions. Sample: [docs/sample-report.md](docs/sample-report.md) |
+| `scan.json` | tools | the full scan: facts, nine gates, typed findings. Large, with absolute paths: not meant to be read |
+
+The plain-language report names checks and findings with words instead of codes; every name comes from one glossary ([references/glossary.md](skills/agents-doctor/references/glossary.md)). Samples: [EN](docs/sample-human-report.md), [RU](docs/sample-human-report.ru.md).
 
 ```
 python skills/agents-doctor/scripts/report_generator.py <scan.json> --out AUDIT.md
+python skills/agents-doctor/scripts/report_human.py <scan.json> --lang ru [--after <scan2.json>]
 python skills/agents-doctor/scripts/sarif.py <scan.json> --out report.sarif
 python skills/agents-doctor/scripts/agents_doctor.py --help
 ```
 
-`sarif.py` writes SARIF 2.1.0 for CI integrations (one rule per gate, one result per fail/warn finding, stable fingerprints). `agents_doctor.py` is the single entry point: `audit --focus security|structure|agents`, `compare` (NEW/RESOLVED/PERSISTING/CHANGED against a baseline), `explain <fid>`, `fix <fid>` — plan-only by default — plus `simulate <root>` (instruction loading per harness) and `ui` (local visual explorer).
-
-For non-technical readers there is a plain-language value report (English and Russian): what is wrong in human words, what it costs (extra tokens every session with the assumption printed, disk space, secrets in plain sight), and — with a second scan after cleanup — what got better. Samples: [EN](docs/sample-human-report.md), [RU](docs/sample-human-report.ru.md).
-
-```
-python skills/agents-doctor/scripts/report_human.py <scan.json> --lang ru [--after <scan2.json>]
-```
+`sarif.py` writes SARIF 2.1.0 for CI integrations (one rule per gate, one result per fail/warn finding, stable fingerprints). `agents_doctor.py` is the single entry point: `audit --focus security|structure|agents`, `summary <scan.json>` (the digest of a finished scan), `compare` (NEW/RESOLVED/PERSISTING/CHANGED against a baseline), `explain <fid>` (a short card: what, where, what to do), `fix <fid>` — plan-only by default — plus `simulate <root>` (instruction loading per harness) and `ui` (local visual explorer).
 
 And for people who do not want to read reports at all, the safe-cleanup wizard tidies up with near-zero risk: a plain-word preview, a typed YES, everything recoverable:
 
@@ -186,7 +194,7 @@ cd qa && python eval.py
 Scenario fixtures with expected results locked before the run; the runner compares the scanner's actual JSON against the locked expectations and writes a report. The current numbers live in the generated line below — never edited by hand (`python tools/check_readme_facts.py`, staleness-gated in CI).
 
 <!-- facts-begin -->
-**Facts:** 1249 tests · QA eval 267 PASS · deterministic scanner, no dependencies
+**Facts:** 1429 tests · QA eval 267 PASS · deterministic scanner, no dependencies
 <!-- facts-end -->
 
 The deterministic core also has a unit and security-regression suite:

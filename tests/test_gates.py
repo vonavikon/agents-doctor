@@ -10,9 +10,13 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'skills' / 'agents-doctor' / 'scripts'))
+sys.path.insert(0, str(Path(__file__).resolve().parent / 'integration'))
 
 import gates
 import report_model
+# report lookups, under the names the tests were written with
+from fixtures import by_check as _by_check, gate_of as _gate  # noqa: E402
+from fixtures import rule_of as _rule  # noqa: E402
 
 FID_RE = re.compile(r'^(SEC|CFG|RUL|DIR|SKL|GIT|GOV|HLTH)-(\d{3})$')
 
@@ -498,6 +502,191 @@ class IdStabilityTests(unittest.TestCase):
             self.assertTrue(f['evidence'])
         for g in gate_list:
             self.assertIn(g['status'], report_model.STATUSES)
+
+
+# --- G5 without skills ----------------------------------------------------------
+
+class SkillsCoverageGateTests(unittest.TestCase):
+    """No skill folders, or none found: gate 5 is not_applicable with a
+    reason, never pass. A report made before the coverage was recorded
+    does not pass either."""
+
+    def _g5(self, skills):
+        gs, findings = gates.evaluate({'skills': skills, 'skills_extra': {}})
+        return _gate({'gates': gs}, 'G5'), findings
+
+    def _assert_no_pass(self, gate):
+        self.assertNotIn('pass', [c['status'] for c in gate['checks']])
+
+    def test_no_skill_folders_is_not_applicable_with_reason(self):
+        gate, findings = self._g5({'entries': [], 'duplicates': [],
+                                   'coverage': {'checked': [], 'failed': [],
+                                                'truncated': []}})
+        self.assertEqual(gate['status'], 'not_applicable')
+        self._assert_no_pass(gate)
+        self.assertTrue(gate['status_reason'])
+        for c in gate['checks']:
+            self.assertEqual(c.get('reason'), gate['status_reason'])
+        self.assertEqual([f for f in findings if f['gate'] == 'G5'], [])
+
+    def test_checked_empty_folders_is_not_applicable(self):
+        gate, _ = self._g5({'entries': [], 'duplicates': [],
+                            'coverage': {'checked': ['project-agents',
+                                                     'user-claude'],
+                                         'failed': [], 'truncated': []}})
+        self.assertEqual(gate['status'], 'not_applicable')
+        self._assert_no_pass(gate)
+        self.assertEqual(_rule(gate, 'duplicate-copies')['status'],
+                         'not_applicable')
+        self.assertEqual(gate['status_why'], 'no_skills_found')
+        self.assertEqual(gate['status_count'], 2)
+
+    def test_old_reports_without_coverage_do_not_pass_either(self):
+        gate, _ = self._g5({'entries': [], 'duplicates': [],
+                            'locations_checked': ['x: y']})
+        self.assertEqual(gate['status'], 'not_applicable')
+        self._assert_no_pass(gate)
+
+    def test_valid_skill_passes(self):
+        entry = {'name': 'ok', 'desc_len': 30, 'has_triggers': True,
+                 'md5': 'x', 'path': 'P', 'location': 'x'}
+        # the gate reads the frontmatter facts by name or by path
+        extra = {'ok': {'frontmatter_ok': True, 'missing_fields': [],
+                        'fields_checked': True, 'parse_error': None,
+                        'dead_refs': [], 'parser': 'yaml', 'path': 'P'}}
+        gs, _ = gates.evaluate({
+            'skills': {'entries': [entry], 'duplicates': [],
+                       'coverage': {'checked': ['x'], 'failed': [],
+                                    'truncated': []}},
+            'skills_extra': extra})
+        self.assertEqual(_gate({'gates': gs}, 'G5')['status'], 'pass')
+
+
+# --- G6 without git: secret prevention -----------------------------------------
+
+def _no_git_facts(**over):
+    facts = {
+        'context_drift': [], 'context_files': [], 'context_tax': {},
+        'harness': {'tools': [], 'project_dirs': [], 'notes': []},
+        'skills': {'entries': [], 'duplicates': []}, 'skills_extra': {},
+        'top_level': [{'name': 'notes.md', 'kind': 'file', 'size_bytes': 10}],
+        'git_roots': [], 'dup_checkouts': {}, 'junk': {},
+        'duplicates': [], 'large_files': [], 'secrets': [],
+        'chain_budget_over': False, 'context_budget': [],
+        'junk_classified': [], 'config_integrity': [],
+        'heavy_outside_git': [],
+    }
+    facts.update(over)
+    return facts
+
+
+def _repo(name, hooks=()):
+    return {'name': name, 'kind': 'repo', 'size_bytes': 1000,
+            'git': {'remote': None, 'last_commit': None, 'dirty': [],
+                    'untracked': [], 'credentials_in_remote': False},
+            'extra': {'hooks': [{'name': h, 'flags': {'secret_scan': True}}
+                                for h in hooks],
+                      'tracked_secrets': [], 'gitignore': True}}
+
+
+class SecretPreventionTests(unittest.TestCase):
+
+    def _evaluate(self, facts):
+        gs, findings = gates.evaluate(facts)
+        return gs, findings
+
+    def test_no_git_no_hook_advice(self):
+        gs, findings = self._evaluate(_no_git_facts())
+        gate = _gate({'gates': gs}, 'G6')
+        self.assertEqual(_rule(gate, 'secret-prevention')['status'],
+                         'not_applicable')
+        self.assertTrue(_rule(gate, 'secret-prevention').get('reason'))
+        self.assertEqual(_by_check({'findings_detailed': findings},
+                                   'SEC_PREVENTION_ABSENT'), [])
+        self.assertEqual(_by_check({'findings_detailed': findings},
+                                   'SEC_PREVENTION_UNVERIFIED'), [])
+        self.assertNotIn('pre-commit', ' '.join(
+            f['recommendation'] for f in findings if f['gate'] == 'G6'))
+        # the rest of the git side is not applicable either, not "pass"
+        self.assertEqual(_rule(gate, 'tracked-secrets')['status'],
+                         'not_applicable')
+        self.assertEqual(_rule(gate, 'history-coverage')['status'],
+                         'not_applicable')
+
+    def test_file_secret_still_fails_without_git(self):
+        sec = [{'path': '.mcp.json', 'line': 7, 'kind': 'api-key',
+                'mask': 'sk-***', 'fingerprint': 'hmac256:x', 'confidence': 0.95}]
+        gs, findings = self._evaluate(_no_git_facts(secrets=sec))
+        gate = _gate({'gates': gs}, 'G6')
+        self.assertEqual(gate['status'], 'fail')
+        self.assertEqual(_rule(gate, 'exposed-secrets')['status'], 'fail')
+        exposed = [f for f in findings if f['gate'] == 'G6'
+                   and f['status'] == 'fail']
+        self.assertEqual(len(exposed), 1)
+        self.assertEqual(exposed[0]['evidence'][0]['line'], 7)
+        self.assertEqual(exposed[0]['evidence'][0]['mask'], 'sk-***')
+        self.assertNotIn('pre-commit', exposed[0]['recommendation'])
+
+    def test_top_level_repo_without_hook_still_warns(self):
+        facts = _no_git_facts(top_level=[_repo('api'), {'name': 'n', 'kind': 'file',
+                                                        'size_bytes': 1}],
+                              git_roots=['api'])
+        gs, findings = self._evaluate(facts)
+        gate = _gate({'gates': gs}, 'G6')
+        self.assertEqual(_rule(gate, 'secret-prevention')['status'], 'warn')
+        hits = _by_check({'findings_detailed': findings}, 'SEC_PREVENTION_ABSENT')
+        self.assertEqual(len(hits), 1)
+        self.assertIn('1 repositories', hits[0]['description'])
+        self.assertNotIn('0 repositories', hits[0]['description'])
+
+    def test_repo_with_secret_scan_hook_passes(self):
+        facts = _no_git_facts(top_level=[_repo('api', hooks=('pre-commit',))],
+                              git_roots=['api'])
+        gs, _ = self._evaluate(facts)
+        self.assertEqual(_rule(_gate({'gates': gs}, 'G6'),
+                                'secret-prevention')['status'], 'pass')
+
+    def test_repositories_nested_in_a_plain_folder_are_unverified(self):
+        # the workspace is a wrapper folder: no repo on top, clones inside
+        facts = _no_git_facts(
+            top_level=[{'name': 'projects', 'kind': 'dir', 'size_bytes': 10}],
+            git_roots=[str(Path('projects') / 'a'),
+                       str(Path('projects') / 'b')])
+        gs, findings = self._evaluate(facts)
+        gate = _gate({'gates': gs}, 'G6')
+        self.assertEqual(_rule(gate, 'secret-prevention')['status'], 'unknown')
+        hits = _by_check({'findings_detailed': findings},
+                         'SEC_PREVENTION_UNVERIFIED')
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0]['status'], 'unknown')
+        self.assertIn('2 repositories', hits[0]['title'])
+        self.assertEqual(_by_check({'findings_detailed': findings},
+                                   'SEC_PREVENTION_ABSENT'), [])
+        self.assertNotIn('pre-commit', hits[0]['recommendation'])
+        # their index and history were not read either
+        self.assertEqual(_rule(gate, 'tracked-secrets')['status'], 'unknown')
+        self.assertEqual(len(_by_check({'findings_detailed': findings},
+                                       'SEC_GIT_SIDE_UNVERIFIED')), 1)
+        hygiene = _gate({'gates': gs}, 'G7')
+        self.assertEqual(hygiene['status'], 'unknown')
+
+    def test_old_report_with_the_root_as_repo_stays_unverified(self):
+        # a report made before the scanner read the folder itself: the
+        # root is listed as a repository, but there is no entry for it
+        facts = _no_git_facts(git_roots=['.'])
+        gs, findings = self._evaluate(facts)
+        self.assertEqual(_rule(_gate({'gates': gs}, 'G6'),
+                                'secret-prevention')['status'], 'unknown')
+        self.assertEqual(len(_by_check({'findings_detailed': findings},
+                                       'SEC_PREVENTION_UNVERIFIED')), 1)
+
+    def test_reports_without_the_repository_list_treat_no_top_repo_as_no_git(self):
+        facts = _no_git_facts()
+        del facts['git_roots']
+        gs, _ = self._evaluate(facts)
+        self.assertEqual(_rule(_gate({'gates': gs}, 'G6'),
+                                'secret-prevention')['status'],
+                         'not_applicable')
 
 
 if __name__ == '__main__':

@@ -109,12 +109,25 @@ class AuditErrors(CliCase):
         self.assertIn('not a directory', err)
 
     def test_audit_rejects_unwritable_out(self):
-        missing_dir = self.base / 'no' / 'such' / 'dir' / 'scan.json'
+        # the parent of --out is a plain file: no folder can be made there
+        blocker = self.base / 'blocker'
+        blocker.write_text('not a folder', encoding='utf-8')
+        bad_out = blocker / 'nested' / 'scan.json'
         code, _out, err = self.run_cli(
             ['audit', str(self.ws), '--home', str(self.home),
-             '--out', str(missing_dir)])
+             '--out', str(bad_out)])
         self.assertEqual(code, 1)
         self.assertIn('cannot write', err)
+
+    def test_audit_creates_a_missing_output_folder(self):
+        # the skill writes into <root>/.agents-doctor/, which does not
+        # exist on a first run
+        fresh = self.base / 'no' / 'such' / 'dir' / 'scan.json'
+        code, out, err = self.run_cli(
+            ['audit', str(self.ws), '--home', str(self.home),
+             '--out', str(fresh)])
+        self.assertEqual(code, 0, err)
+        self.assertTrue(fresh.is_file())
 
     def test_argparse_usage_error_exits_2(self):
         with self.assertRaises(SystemExit) as cx:

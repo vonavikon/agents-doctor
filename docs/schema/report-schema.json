@@ -51,10 +51,21 @@
         "skipped_symlinks_outside": {
           "type": "number"
         },
+        "own_source_skipped": {
+          "type": "number",
+          "description": "Files not read for keys because they lie in a copy of the plugin's own source tree (a folder holding both audit_scan.py and secret_rules.py); absent in reports made before the counter existed."
+        },
         "duration_sec": {
           "type": "number"
         }
       }
+    },
+    "git_roots": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Every folder holding a .git, as a path relative to root; '.' is the audited folder itself when it is a repository."
     },
     "gates": {
       "type": "array",
@@ -80,36 +91,60 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "pass",
-              "fail",
-              "warn",
-              "unknown",
-              "not_applicable"
-            ]
-          },
-          "checks": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "rule": {
-                  "type": "string"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "pass",
-                    "fail",
-                    "warn",
-                    "unknown",
-                    "not_applicable"
-                  ]
+              "enum": [
+                "pass",
+                "fail",
+                "warn",
+                "unknown",
+                "not_applicable"
+              ]
+            },
+            "checks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "rule": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pass",
+                      "fail",
+                      "warn",
+                      "unknown",
+                      "not_applicable"
+                    ]
+                  },
+                  "why": {
+                    "type": "string",
+                    "description": "Code from the glossary saying why the rule is unknown or not_applicable (no_skills_found, no_git, history_not_scanned, facts_missing, ...); absent for pass, fail and warn."
+                  },
+                  "count": {
+                    "type": "number",
+                    "description": "Number the 'why' text is written with (folders checked, repositories not read)."
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "The same reason as an English sentence."
+                  }
                 }
               }
-            }
-          },
-          "pass_when": {
+            },
+            "status_reason": {
+              "type": "string",
+              "description": "English sentence: why the gate is unknown or not_applicable (the reason of its first rule carrying that status)."
+            },
+            "status_why": {
+              "type": "string",
+              "description": "Glossary code of that reason."
+            },
+            "status_count": {
+              "type": "number",
+              "description": "Number the reason text is written with."
+            },
+            "pass_when": {
             "type": "string"
           },
           "fail_when": {
@@ -250,6 +285,15 @@
           },
           "confidence": {
             "type": "number"
+          },
+          "git": {
+            "type": "string",
+            "enum": [
+              "tracked",
+              "ignored",
+              "untracked"
+            ],
+            "description": "Where the file sits in the nearest repository around it, when there is one: tracked (in the index), ignored (kept out by .gitignore) or untracked (not added yet)."
           }
         }
       }
@@ -346,7 +390,82 @@
       "type": "array"
     },
     "large_files": {
-      "type": "array"
+      "type": "array",
+      "description": "Files at or over the large-file threshold.",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "size_bytes"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "number"
+          },
+          "tracked": {
+            "type": "boolean",
+            "description": "Present when the audited folder is a repository and git listed the file: true when the file is tracked, false when it has no history behind it."
+          }
+        }
+      }
+    },
+    "skills": {
+      "type": "object",
+      "description": "Skill folders and SKILL.md health (entries, duplicates).",
+      "properties": {
+        "coverage": {
+          "type": "object",
+          "description": "What the skill search actually covered; absent in reports made before it was recorded.",
+          "properties": {
+            "checked": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Locations (folder kinds) that were read."
+            },
+            "failed": {
+              "type": "array",
+              "description": "Folders that exist but could not be read; their rules are unknown.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "location": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "truncated": {
+              "type": "array",
+              "description": "Folders cut by the per-folder cap; their rules are unknown.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "location": {
+                    "type": "string"
+                  },
+                  "scanned": {
+                    "type": "number"
+                  },
+                  "found": {
+                    "type": "number"
+                  },
+                  "cap": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "harnesses": {
       "type": "array",

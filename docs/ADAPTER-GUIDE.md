@@ -64,13 +64,22 @@ class MyAdapter(HarnessAdapter):
    compatibility→G8 (mapping lives in `harness/collect.py`).
    Unknown territory yields `status='unknown'`, never a pass.
 
-6. **Register the import** in `harness/__init__.py::_ensure_imported`.
+6. **Plain name**: add every new `check_id` to `ADAPTER_KINDS` in
+   `scripts/glossary.py` with a short title and one "what to do"
+   sentence in Russian and English, then run
+   `python tools/gen_glossary.py`. The digest and both reports name
+   findings through the glossary, and `tests/test_glossary.py` fails on
+   a check without an entry (and on an entry whose check is gone).
 
-7. **Tests**: `tests/test_harness_<name>.py`, unittest, stdlib only,
+7. **Register the import** in `harness/__init__.py::_ensure_imported`.
+
+8. **Tests**: `tests/test_harness_<name>.py`, unittest, stdlib only,
    Windows-compatible, fixtures in temp dirs. Minimum: registration,
    markers, resolve_chain hierarchy + inactive reasons, every check_id
    positive AND negative (a clean workspace yields zero findings),
-   `to_dict()` serializability.
+   `to_dict()` serializability. A test about redaction, a boundary or a
+   read-only guarantee goes to `tests/test_security_regression.py`,
+   with canary keys planted (`docs/contributing.md`, "Test placement").
 
 ## Rules that keep the system honest
 

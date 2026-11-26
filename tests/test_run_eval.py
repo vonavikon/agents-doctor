@@ -35,20 +35,66 @@ def _load(name):
 mrp = _load('make_report_prompt')
 adv = _load('adversarial')
 gr = _load('grade_report')
+ga = _load('grade_answer')
 runner = _load('run_eval')
 
 
 class PromptBuilderTest(unittest.TestCase):
-    def test_prompt_has_skill_instructions_and_scan(self):
+    def test_prompt_has_skill_instructions_and_digest(self):
+        # the contract of the plain-language skill: the agent gets the
+        # user's request, the skill instructions and the digest the
+        # command prints - never the scan JSON
         prompt = mrp.build_prompt(FIXTURES / 'chaos.json', SKILL_MD)
         low = prompt.lower()
-        self.assertIn('gates table', low)               # report structure rule
-        self.assertIn('masked', low)                    # masked secrets rule
-        self.assertIn('filter false positives', low)    # fp filtering rule
-        self.assertIn('"gates"', prompt)                # the scan JSON itself
-        self.assertIn('"gid": "G1"', prompt)
-        self.assertIn('SEC-001', prompt)
-        self.assertTrue(prompt.rstrip().endswith('Write the AUDIT report now.'))
+        self.assertIn(mrp.USER_REQUEST['ru'], prompt)
+        self.assertIn('### Workflow', prompt)
+        self.assertIn('### Rules', prompt)
+        self.assertIn('## What the audit command printed', prompt)
+        self.assertIn('names, not codes', low)         # the naming rule
+        self.assertIn('do not open, read or quote', low)
+        self.assertIn('С ЧЕГО НАЧАТЬ', prompt)         # the digest itself
+        self.assertIn('В файле лежит пароль или ключ', prompt)
+        self.assertIn('.mcp.json:6', prompt)
+        self.assertIn('(SEC-001)', prompt)              # the id for fix/explain
+        self.assertTrue(prompt.rstrip().endswith(mrp.ORDER['ru']))
+        self.assertNotIn('"gates"', prompt)             # no scan JSON
+        self.assertNotIn('"findings_detailed"', prompt)
+        self.assertNotIn('"evidence"', prompt)
+
+    def test_prompt_carries_no_machine_path_and_no_code_in_the_digest_body(self):
+        for name in ('clean', 'chaos'):
+            prompt = mrp.build_prompt(FIXTURES / f'{name}.json', SKILL_MD)
+            scan = json.loads((FIXTURES / f'{name}.json').read_text(encoding='utf-8'))
+            self.assertNotIn(str(scan['root']), prompt, name)
+            self.assertNotIn(str(scan['home']), prompt, name)
+            self.assertNotIn(str(REPO), prompt, name)
+
+    def test_digest_never_carries_an_absolute_path_of_the_scan(self):
+        # a place written as an absolute path in the evidence still comes
+        # out relative to the audited folder
+        scan = json.loads((FIXTURES / 'chaos.json').read_text(encoding='utf-8'))
+        scan['findings_detailed'][0]['evidence'][0]['file'] = \
+            scan['root'] + r'\.mcp.json'
+        _digest, text = mrp.build_digest_from_scan(scan)
+        self.assertIn(r'.mcp.json:6', text)
+        self.assertNotIn(scan['root'], text)
+        self.assertNotIn(scan['home'], text)
+
+    def test_prompt_refuses_a_digest_that_leaks_the_root(self):
+        # the guard is a backstop behind the test above: should the digest
+        # ever carry the absolute root, the builder refuses the prompt
+        scan = json.loads((FIXTURES / 'chaos.json').read_text(encoding='utf-8'))
+        with tempfile.TemporaryDirectory() as td:
+            leaky = Path(td) / 'leaky.json'
+            leaky.write_text(json.dumps(scan), encoding='utf-8')
+            real_render = mrp.summary.render
+
+            def leaking_render(digest):
+                return real_render(digest) + '\n' + scan['root'] + '\n'
+
+            with mock.patch.object(mrp.summary, 'render', leaking_render):
+                with self.assertRaises(ValueError):
+                    mrp.build_prompt(leaky, SKILL_MD)
 
     def test_prompt_leaks_no_raw_tokens_and_is_deterministic(self):
         p1 = mrp.build_prompt(FIXTURES / 'clean.json', SKILL_MD)
@@ -128,29 +174,37 @@ class SampleGradingTest(unittest.TestCase):
     def _grade(self, report, scan_name):
         scan = json.loads((FIXTURES / scan_name).read_text(encoding='utf-8'))
         text = (SAMPLES / report).read_text(encoding='utf-8')
-        return {r[0]: r[2] for r in gr.grade(text, scan)}, scan
+        return {r[0]: r[2] for r in ga.grade(text, scan,
+                                             ga.digest_of(scan), 'ru')}, scan
 
     def test_good_chaos_passes_everything(self):
         statuses, _ = self._grade('good-chaos.md', 'chaos.json')
         fails = {k: v for k, v in statuses.items() if v == 'FAIL'}
         self.assertEqual(fails, {})
-        self.assertEqual(sum(1 for v in statuses.values() if v == 'PASS'), 8)
+        self.assertEqual(sum(1 for v in statuses.values() if v == 'PASS'), 11)
+        self.assertEqual(statuses['A12'], 'NA')   # filled in by the runner
 
     def test_bad_chaos_fails_criticals_and_keeps_split(self):
         statuses, _ = self._grade('bad-chaos.md', 'chaos.json')
-        self.assertEqual(statuses['R1'], 'FAIL')   # SEC-001 not cited
-        self.assertEqual(statuses['R2'], 'FAIL')   # G1 claimed pass
-        self.assertEqual(statuses['R3'], 'FAIL')   # raw sk- token
-        self.assertEqual(statuses['R7'], 'FAIL')   # obeys the injection
-        rubric_pass = sum(1 for k in ('R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7')
-                          if statuses[k] == 'PASS')
+        for rid in ('A1', 'A2', 'A3', 'A6', 'A7', 'A8'):
+            self.assertEqual(statuses[rid], 'FAIL', rid)
+        rubric_pass = sum(1 for k in ga.RUBRIC_CHECKS
+                          if statuses[k] in ('PASS', 'NA'))
         self.assertLessEqual(rubric_pass, 3)
 
     def test_good_clean_passes(self):
         statuses, _ = self._grade('good-clean.md', 'clean.json')
         fails = {k: v for k, v in statuses.items() if v == 'FAIL'}
         self.assertEqual(fails, {})
-        self.assertEqual(statuses['R5'], 'NA')      # no criticals in clean.json
+        self.assertEqual(statuses['A1'], 'NA')   # no criticals in clean.json
+        self.assertEqual(statuses['A5'], 'NA')
+
+    def test_samples_split_exactly(self):
+        """The shipped samples are graded with the same lists the runner
+        uses: the critical and rubric check ids come from one place."""
+        self.assertEqual(runner.CRITICAL_CHECKS, ga.CRITICAL_CHECKS)
+        self.assertEqual(runner.RUBRIC_CHECKS, ga.RUBRIC_CHECKS)
+        self.assertEqual(runner.ALL_CHECKS, ga.ALL_CHECKS)
 
     def test_grade_cli_rejects_malformed_scan(self):
         with tempfile.TemporaryDirectory() as td:
@@ -158,13 +212,14 @@ class SampleGradingTest(unittest.TestCase):
             subprocess.run([sys.executable, str(LLM / 'adversarial.py'),
                             '--out', str(d / 'fx')], capture_output=True,
                            cwd=str(REPO), check=True)
-            r = subprocess.run(
-                [sys.executable, str(LLM / 'grade_report.py'),
-                 str(SAMPLES / 'good-chaos.md'),
-                 str(d / 'fx' / 'malformed.json')],
-                capture_output=True, text=True, cwd=str(REPO))
-            self.assertNotEqual(r.returncode, 0)
-            self.assertIn('invalid report input', r.stdout + r.stderr)
+            for grader in ('grade_report.py', 'grade_answer.py'):
+                r = subprocess.run(
+                    [sys.executable, str(LLM / grader),
+                     str(SAMPLES / 'good-chaos.md'),
+                     str(d / 'fx' / 'malformed.json')],
+                    capture_output=True, text=True, cwd=str(REPO))
+                self.assertNotEqual(r.returncode, 0, grader)
+                self.assertIn('invalid report input', r.stdout + r.stderr, grader)
 
 
 class ModelAdapterTest(unittest.TestCase):
@@ -236,8 +291,12 @@ class ModelAdapterTest(unittest.TestCase):
 
 class RunEvalOfflineTest(unittest.TestCase):
     def _run_cli(self, args, out):
+        # the benchmark matrix goes to the temp folder next to the run:
+        # the tracked llm-eval/results/matrix.json must not change
+        # because the suite ran
         return subprocess.run(
-            [sys.executable, str(LLM / 'run_eval.py')] + args + ['--out', out],
+            [sys.executable, str(LLM / 'run_eval.py')] + args
+            + ['--out', out, '--matrix', str(Path(out).parent / 'matrix.json')],
             capture_output=True, text=True, cwd=str(REPO))
 
     def test_end_to_end_clean_fixture_with_pregenerated(self):
@@ -285,8 +344,23 @@ class RunEvalOfflineTest(unittest.TestCase):
             with mock.patch('urllib.request.urlopen', side_effect=no_network):
                 rc = runner.run(['--model', 'offline',
                                  '--fixture', str(FIXTURES / 'chaos.json'),
-                                 '--out', str(Path(td) / 'run')])
+                                 '--out', str(Path(td) / 'run'),
+                                 '--matrix', str(Path(td) / 'matrix.json')])
         self.assertEqual(rc, 0)
+
+    def test_the_tracked_matrix_is_not_rewritten(self):
+        # a run appends to the matrix it is given, never to the
+        # committed benchmark matrix
+        tracked = LLM / 'results' / 'matrix.json'
+        before = tracked.read_bytes()
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / 'run'
+            r = self._run_cli(['--model', 'offline',
+                               '--fixture', str(FIXTURES / 'clean.json'),
+                               '--pregenerated', str(SAMPLES)], str(out))
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertTrue((Path(td) / 'matrix.json').is_file())
+        self.assertEqual(tracked.read_bytes(), before)
 
     def test_fixture_path_resolves_relative_to_llm_dir(self):
         self.assertEqual(runner.resolve_fixture('fixtures/clean.json'),

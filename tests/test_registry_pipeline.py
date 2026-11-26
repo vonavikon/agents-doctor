@@ -73,7 +73,9 @@ class RegistryPipelineTest(unittest.TestCase):
     def test_clean_workspace_no_adapter_findings(self):
         root, home = _ws()
         rep = audit_scan.scan(root, home, False)
-        af = [f for f in rep['findings_detailed'] if f.get('check_id')]
+        # adapter findings are the ones carrying a harness: every
+        # finding has a check_id (it names the finding type)
+        af = [f for f in rep['findings_detailed'] if f.get('harness')]
         self.assertEqual(af, [])
         self.assertEqual(rep['instruction_conflict_summary'],
                          {'contradiction': 0, 'duplication': 0,

@@ -1,6 +1,6 @@
 {
-  "description": "Oversized tracked blob, dirty tree, no .gitignore, duplicate checkout of one remote.",
-  "gates": {"1": "pass", "2": "warn", "3": "pass", "4": "pass", "5": "pass", "6": "warn", "7": "fail", "8": "pass", "9": "pass"},
+  "description": "Oversized tracked blob, dirty tree, no .gitignore, duplicate checkout of one remote. No skills in the fixture: G5 is not applicable (an empty skill search is never a pass).",
+  "gates": {"1": "pass", "2": "warn", "3": "pass", "4": "pass", "5": "not_applicable", "6": "warn", "7": "fail", "8": "pass", "9": "pass"},
   "counts": {"secrets": 0, "junk_files": 0, "junk_dirs": 0, "empty_dirs": 0, "duplicates": 0, "large_files": 1, "context_drift": 0, "dup_checkouts": 1},
   "findings_schema": true
 }

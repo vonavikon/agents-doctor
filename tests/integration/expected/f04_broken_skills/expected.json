@@ -1,6 +1,6 @@
 {
-  "description": "Skills with a missing field, an over-limit description and a diverged duplicate.",
-  "gates": {"1": "warn", "2": "warn", "3": "pass", "4": "warn", "5": "fail", "6": "warn", "7": "not_applicable", "8": "pass", "9": "pass"},
+  "description": "Skills with a missing field, an over-limit description and a diverged duplicate. No git in the fixture: secret prevention is not applicable, so G6 has no hook to ask for.",
+  "gates": {"1": "warn", "2": "warn", "3": "pass", "4": "warn", "5": "fail", "6": "pass", "7": "not_applicable", "8": "pass", "9": "pass"},
   "counts": {"secrets": 0, "junk_files": 0, "junk_dirs": 0, "empty_dirs": 0, "duplicates": 0, "large_files": 0, "context_drift": 0, "dup_checkouts": 0},
   "findings_schema": true
 }

@@ -28,6 +28,7 @@ def _load(name):
 
 
 gr = _load('grade_report')
+ga = _load('grade_answer')
 runner = _load('run_eval')
 mf = _load('make_fixtures')
 
@@ -187,7 +188,7 @@ class R12JaccardTest(unittest.TestCase):
 
     def _prev_entry(self, fids):
         return {'model': 'm1', 'prompt_version': self.PV, 'mode': 'online',
-                'ts': '20261118-000000', 'fid_mentions': sorted(fids)}
+                'ts': '20261118-000000', 'spot_mentions': sorted(fids)}
 
     def test_na_without_previous_run(self):
         self.assertIsNone(runner.compute_r12({'SEC-001'}, [], 'm1', self.PV))
@@ -253,8 +254,7 @@ class OfflineRunArtifactsTest(unittest.TestCase):
             self.assertEqual(entry['prompt_version'], runner.PROMPT_VERSION)
             self.assertIsNone(entry['latency_ms'])
             self.assertIsNone(entry['tokens'])
-            self.assertEqual(sorted(entry['scores']),
-                             sorted(f'R{i}' for i in range(1, 13)))
+            self.assertEqual(sorted(entry['scores']), sorted(ga.ALL_CHECKS))
             self.assertEqual(entry['result'], 'PASS')
 
     def test_report_json_offline_split(self):
@@ -270,17 +270,30 @@ class OfflineRunArtifactsTest(unittest.TestCase):
             # no key material anywhere in the artifact
             self.assertNotIn('OPENAI_API_KEY', json.dumps(rep))
 
-    def test_verdicts_carry_r8_r12(self):
+    def test_verdicts_carry_every_check(self):
         with tempfile.TemporaryDirectory() as td:
             out, matrix = Path(td) / 'run', Path(td) / 'matrix.json'
             self.assertEqual(self._run(out, matrix), 0)
             v = json.loads((out / 'chaos-good' / 'verdict.json')
                            .read_text(encoding='utf-8'))
-            for rid in ('R8', 'R9', 'R10', 'R11'):
+            # the good sample passes all eleven graded checks; the
+            # twelfth needs a previous run and stays NA
+            for rid in ga.ALL_CHECKS[:-1]:
                 self.assertEqual(v['checks'][rid]['status'], 'pass', rid)
-            self.assertEqual(v['checks']['R12']['status'], 'na')
+            self.assertEqual(v['checks']['A12']['status'], 'na')
             self.assertEqual(v['prompt_version'], runner.PROMPT_VERSION)
             self.assertIsNone(v['model_meta'])
+            # the graded part of the verdict names no machine path and no
+            # secret. Its two input fields, `fixture` and `report`, are
+            # the paths of the files it graded and are left out here.
+            # The path of this checkout is escaped the way json.dumps
+            # writes it, so the assertion can fail.
+            dumped = json.dumps(v, ensure_ascii=False)
+            graded = json.dumps({k: x for k, x in v.items()
+                                 if k not in ('fixture', 'report')},
+                                ensure_ascii=False)
+            self.assertNotIn(json.dumps(str(REPO))[1:-1], graded)
+            self.assertNotIn('sk-', dumped)
 
 
 class _FakeResp:
@@ -377,12 +390,16 @@ class OnlineModeTest(unittest.TestCase):
             self.assertEqual(entry['model'], 'test-model')
             self.assertIsInstance(entry['latency_ms'], float)
             self.assertEqual(entry['tokens']['total_tokens'], 1040)
-            self.assertIn('SEC-001', entry['fid_mentions'])
+            self.assertIn('SEC-001', entry['spot_mentions'])
             v = json.loads((out / 'chaos' / 'verdict.json')
                            .read_text(encoding='utf-8'))
             self.assertEqual(v['model_meta']['model'], 'test-model')
             self.assertEqual(v['model_meta']['harness'], 'none')
-            self.assertEqual(v['checks']['R12']['status'], 'na')
+            self.assertEqual(v['checks']['A12']['status'], 'na')
+            # the prompt sent to the model is the digest one, not the scan
+            prompt = (out / 'chaos' / 'prompt.txt').read_text(encoding='utf-8')
+            self.assertIn('С ЧЕГО НАЧАТЬ', prompt)
+            self.assertNotIn('"findings_detailed"', prompt)
 
     def test_repeat_online_run_grades_r12(self):
         with tempfile.TemporaryDirectory() as td:
@@ -392,22 +409,28 @@ class OnlineModeTest(unittest.TestCase):
             self.assertEqual(self._online_run(out2, m1), 0)
             v2 = json.loads((out2 / 'chaos' / 'verdict.json')
                             .read_text(encoding='utf-8'))
-            self.assertEqual(v2['checks']['R12']['status'], 'pass')
-            self.assertIn('jaccard 1.00', v2['checks']['R12']['evidence'])
-            # a report citing only a sliver of the previous fid set drops
-            # the jaccard far below 0.8 and fails R12 (still a clean report,
-            # so the run itself stays green - R12 is data, not a gate)
-            drift = ('# Report\n\nGates: G2 pass; G1 fail, G3 fail, G4 fail, '
-                     'G5 fail, G6 fail, G8 fail; G7 warn, G9 warn.\n\n'
-                     'Recommended action: fix SEC-001 and SEC-002 first; '
-                     'rotate both secrets, then repair the drifted pair '
-                     'DIR-001 and the dead references RUL-001 through '
-                     'RUL-004, and clean the junk listed under HLTH-001.\n')
+            self.assertEqual(v2['checks']['A12']['status'], 'pass')
+            self.assertIn('jaccard 1.00', v2['checks']['A12']['evidence'])
+            # an answer that names the place of the two critical findings
+            # only (and nothing else) drops the jaccard far below 0.8 and
+            # fails A12. The critical checks still pass, so the run stays
+            # green: A12 is data, not a gate.
+            drift = ('Проверила вашу папку: 6 проверок красные и 2 жёлтые.\n\n'
+                     '## С чего начать\n\n'
+                     '1. В файле `.mcp.json` на строке 6 лежит ключ. '
+                     'Сначала смените его у того, кто выдал, затем уберите '
+                     'из файла.\n'
+                     '2. Ключ в файле `config.py` (строка 1) попал в '
+                     'историю проекта. Сначала смените ключ, затем уберите '
+                     'файл из истории.\n\n'
+                     'Историю Git на ключи я не проверяла.\n\n'
+                     'Полный простой отчёт лежит в файле '
+                     '`.agents-doctor/REPORT.md`.\n')
             out3 = Path(td) / 'run3'
             self.assertEqual(self._online_run(out3, m1, content=drift), 0)
             v3 = json.loads((out3 / 'chaos' / 'verdict.json')
                             .read_text(encoding='utf-8'))
-            self.assertEqual(v3['checks']['R12']['status'], 'fail')
+            self.assertEqual(v3['checks']['A12']['status'], 'fail')
 
 
 if __name__ == '__main__':

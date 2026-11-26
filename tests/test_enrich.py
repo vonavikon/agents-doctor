@@ -2,9 +2,11 @@
 
 Covers config parse integrity, heavy dirs outside git, junk classification
 with real git fixtures, harness activity states and SKILL.md frontmatter
-health. PyYAML-dependent expectations branch on its availability; the toml
-branch skips when the interpreter has no tomllib.
+health, including the position a broken header reports. PyYAML-dependent
+expectations branch on its availability; the toml branch skips when the
+interpreter has no tomllib.
 """
+import json
 import os
 import shutil
 import stat
@@ -16,8 +18,14 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'skills' / 'agents-doctor' / 'scripts'))
+sys.path.insert(0, str(Path(__file__).resolve().parent / 'integration'))
 
 import enrich
+import gates  # noqa: E402
+from fixtures import BROKEN_LINE, TmpCase, skill_file  # noqa: E402
+# report lookups, under the names the frontmatter tests were written with
+from fixtures import by_check as _by_check, gate_of as _gate  # noqa: E402
+from fixtures import rule_of as _rule  # noqa: E402
 
 GIT_AVAILABLE = shutil.which('git') is not None
 MB = 1024 * 1024
@@ -424,6 +432,99 @@ class SkillsFrontmatterTests(EnrichTestCase):
             self.assertEqual(rec2['missing_fields'], [])
         finally:
             enrich.yaml = saved
+
+
+# --- broken frontmatter: the position of the error ----------------------------
+
+class FrontmatterErrorTests(TmpCase):
+    """A header that does not parse reports where the error sits, not a
+    list of fields that are in fact present."""
+
+    def _skill(self, frontmatter, name='skill'):
+        return skill_file(self.root, name, frontmatter)
+
+    def _record(self, path):
+        recs = enrich.skills_frontmatter([{'path': str(path)}])
+        return next(iter(recs.values()))
+
+    def test_broken_line_reports_position_not_missing_fields(self):
+        rec = self._record(self._skill('name: broken\n' + BROKEN_LINE))
+        self.assertIs(rec['frontmatter_ok'], False)
+        # the fields are written in the file; they were not evaluated
+        self.assertEqual(rec['missing_fields'], [])
+        self.assertIs(rec['fields_checked'], False)
+        err = rec['parse_error']
+        self.assertEqual((err['line'], err['column']), (3, 24))
+
+    def test_valid_yaml_without_description_is_still_missing(self):
+        rec = self._record(self._skill('name: nodesc'))
+        self.assertIs(rec['frontmatter_ok'], True)
+        self.assertIs(rec['fields_checked'], True)
+        self.assertEqual(rec['missing_fields'], ['description'])
+        self.assertIsNone(rec['parse_error'])
+
+    def test_no_block_means_the_fields_are_absent(self):
+        p = self.put(self.root, 'bare/SKILL.md', 'Just body, no fences.')
+        rec = self._record(p)
+        self.assertIs(rec['frontmatter_ok'], False)
+        self.assertEqual(rec['missing_fields'], ['name', 'description'])
+        self.assertIsNone(rec['parse_error'])
+
+    def test_unreadable_file_claims_nothing(self):
+        recs = enrich.skills_frontmatter(
+            [{'path': str(self.root / 'nope' / 'SKILL.md')}])
+        rec = next(iter(recs.values()))
+        self.assertIs(rec['frontmatter_ok'], None)
+        self.assertEqual(rec['missing_fields'], [])
+        self.assertIs(rec['fields_checked'], False)
+
+    def test_without_pyyaml_the_same_line_is_rejected_too(self):
+        # stdlib-only installs must not read the broken block as valid
+        saved = enrich.yaml
+        enrich.yaml = None
+        try:
+            rec = self._record(self._skill('name: broken\n' + BROKEN_LINE))
+            self.assertEqual(rec['parser'], 'fallback')
+            self.assertIs(rec['frontmatter_ok'], False)
+            self.assertEqual(rec['missing_fields'], [])
+            self.assertEqual((rec['parse_error']['line'],
+                              rec['parse_error']['column']), (3, 24))
+        finally:
+            enrich.yaml = saved
+
+    def test_without_pyyaml_valid_values_stay_valid(self):
+        saved = enrich.yaml
+        enrich.yaml = None
+        try:
+            rec = self._record(self._skill(
+                'name: fine\ndescription: "Use when: asked for a demo"'))
+            self.assertIs(rec['frontmatter_ok'], True)
+            self.assertEqual(rec['missing_fields'], [])
+            rec = self._record(self._skill(
+                'name: links\ndescription: See https://example.com/docs'))
+            self.assertIs(rec['frontmatter_ok'], True)
+            # a colon not followed by a space is plain text (a URL)
+            self.assertIsNone(rec['parse_error'])
+        finally:
+            enrich.yaml = saved
+
+    def test_gate_finding_carries_the_error_position(self):
+        p = self._skill('name: broken\n' + BROKEN_LINE)
+        skills = {'entries': [{'name': 'broken', 'path': str(p), 'desc_len': 0,
+                               'has_triggers': True, 'md5': 'x', 'location': 'x'}],
+                  'duplicates': [], 'locations_checked': ['x: y'],
+                  'coverage': {'checked': ['x'], 'failed': [], 'truncated': []}}
+        extra = enrich.skills_frontmatter(skills['entries'])
+        rep = {'skills': skills, 'skills_extra': extra}
+        gs, findings = gates.evaluate(rep)
+        hits = _by_check({'findings_detailed': findings}, 'SKL_FRONTMATTER_INVALID')
+        self.assertEqual(len(hits), 1)
+        ev = hits[0]['evidence'][0]
+        self.assertEqual((ev['error_line'], ev['error_column']), (3, 24))
+        self.assertIn('line 3, column 24', hits[0]['title'])
+        self.assertNotIn('prepare a short report', json.dumps(findings))
+        self.assertEqual(_rule(_gate({'gates': gs}, 'G5'), 'frontmatter')['status'],
+                         'fail')
 
 
 if __name__ == '__main__':

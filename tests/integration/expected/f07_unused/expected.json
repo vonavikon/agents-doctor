@@ -1,6 +1,6 @@
 {
-  "description": "Non-git junk with old mtimes and twelve empty directories.",
-  "gates": {"1": "pass", "2": "warn", "3": "pass", "4": "warn", "5": "pass", "6": "warn", "7": "not_applicable", "8": "pass", "9": "warn"},
+  "description": "Non-git junk with old mtimes and twelve empty directories. No skills in the fixture: G5 is not applicable (an empty skill search is never a pass). No git in the fixture: secret prevention is not applicable, so G6 has no hook to ask for.",
+  "gates": {"1": "pass", "2": "warn", "3": "pass", "4": "warn", "5": "not_applicable", "6": "pass", "7": "not_applicable", "8": "pass", "9": "warn"},
   "counts": {"secrets": 0, "junk_files": 3, "junk_dirs": 0, "empty_dirs": 12, "duplicates": 0, "large_files": 0, "context_drift": 0, "dup_checkouts": 0},
   "confirmed_unused_min": 2,
   "findings_schema": true

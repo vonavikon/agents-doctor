@@ -8,9 +8,16 @@ the only subprocesses are the read-only git calls the scanner itself
 makes.
 
 Subcommands:
-  audit <root> [options]         scan a workspace, write scan.json
+  audit <root> [options]         scan a workspace, write scan.json; with
+                                 --human, --report and --summary it also
+                                 leaves the plain-language and the
+                                 technical report on disk and prints the
+                                 short digest (the agent reads that, not
+                                 the JSON)
   compare <new.json> <old.json>  fingerprint diff: NEW/RESOLVED/PERSISTING/CHANGED
-  explain <scan.json> <fid>      print one typed finding in full
+  summary <scan.json>            print the short digest of a finished scan
+  explain <scan.json> <fid>      print one finding as a short card
+                                 (--raw: the full record with evidence)
   fix <scan.json> <fid>          plan a fix; with --apply run it after
                                  an interactive confirmation (delegates
                                  to remediate.py)
@@ -149,6 +156,7 @@ def cmd_audit(a):
             print('warning: policies.py unavailable, policy step skipped',
                   file=sys.stderr)
     try:
+        _ensure_parent(a.out)
         Path(a.out).write_text(
             json.dumps(rep, ensure_ascii=False, indent=2), encoding='utf-8')
     except OSError as exc:
@@ -190,11 +198,27 @@ def cmd_audit(a):
                     print('  [%s] %s: %s' % (c.get('status'),
                                              c.get('id'),
                                              c.get('detail', '')[:120]))
+    # artifacts are named relative to the audited folder: the absolute
+    # paths of the machine stay out of what the agent reads
     line = ('audit: %d gates, %d findings -> %s'
-            % (len(rep['gates']), len(rep['findings_detailed']), a.out))
+            % (len(rep['gates']), len(rep['findings_detailed']),
+               _shown_path(a.out, root)))
     if a.focus:
         line += ' (focus: %s)' % a.focus
     print(line)
+    if getattr(a, 'human', None):
+        rc = _write_human(rep, a.human, a.lang, a.sessions)
+        if rc:
+            return rc
+    if getattr(a, 'summary', False):
+        import summary
+        files = {'scan': _shown_path(a.out, root)}
+        if a.report:
+            files['report'] = _shown_path(a.report, root)
+        if a.human:
+            files['human'] = _shown_path(a.human, root)
+        print()
+        print(summary.render(summary.build(rep, a.lang, files=files)))
     # success path only: leave a row in the root-local history. A focused
     # report is partial and would skew the trend, so it is not recorded.
     # History must never fail the audit.
@@ -265,10 +289,18 @@ def cmd_sarif(a):
     return 0
 
 
+def _ensure_parent(path):
+    """Create the folder an output file goes into (.agents-doctor/ under
+    the audited folder does not exist on a first run)."""
+    parent = Path(path).resolve().parent
+    if not parent.is_dir():
+        parent.mkdir(parents=True, exist_ok=True)
+
+
 def _write_report(rep, report_path):
     """--report branch: report_generator.py is optional and may not be
-    installed yet; a missing or incompatible one is a clean error, not
-    a traceback."""
+    installed yet; a missing or incompatible one is a clean error, not a
+    traceback."""
     try:
         import report_generator
     except ImportError:
@@ -281,11 +313,42 @@ def _write_report(rep, report_path):
         return 1
     try:
         markdown = generate(rep)
+        _ensure_parent(report_path)
         Path(report_path).write_text(markdown, encoding='utf-8')
     except (OSError, TypeError, ValueError) as exc:
         return _err('report generation failed: %s' % exc)
-    print('report: %s' % report_path)
+    print('report: %s' % _shown_path(report_path, rep.get('root')))
     return 0
+
+
+def _write_human(rep, human_path, lang, sessions):
+    """--human branch: the plain-language report for non-technical
+    readers (report_human.py), in the language asked for."""
+    try:
+        import report_human
+    except ImportError:
+        print('%s: plain-language report unavailable' % PROG, file=sys.stderr)
+        return 1
+    try:
+        markdown = report_human.generate_human_markdown(
+            rep, lang=lang, sessions_per_day=sessions)
+        _ensure_parent(human_path)
+        Path(human_path).write_text(markdown, encoding='utf-8')
+    except (OSError, TypeError, ValueError) as exc:
+        return _err('plain-language report failed: %s' % exc)
+    print('human report (%s): %s' % (lang, _shown_path(human_path, rep.get('root'))))
+    return 0
+
+
+def _shown_path(path, root):
+    """A file path as the output shows it: relative to the audited
+    folder when the file lies inside it, as given otherwise."""
+    try:
+        import summary
+    except ImportError:
+        return str(path)
+    return summary.file_alias(str(Path(path).resolve()), root, None) \
+        or str(path)
 
 
 def cmd_compare(a):
@@ -325,11 +388,37 @@ def cmd_explain(a):
         return 1
     for f in rep.get('findings_detailed') or []:
         if f.get('fid') == a.fid:
-            _print_finding(f)
-            print('explain: printed %s from %s' % (a.fid, a.scan))
+            if getattr(a, 'raw', False):
+                _print_finding(f)
+            else:
+                # the digest view: what, where, what to do. The raw
+                # evidence (absolute paths, quoted lines) stays in the
+                # scan file on disk; --raw prints it as before.
+                import summary
+                print(summary.explain_card(f, rep, a.lang))
+            print('explain: %s printed' % a.fid)
             return 0
     print('%s: finding not found: %s' % (PROG, a.fid), file=sys.stderr)
     return 2
+
+
+def cmd_summary(a):
+    """The short digest of a finished scan: what the agent reads instead
+    of the scan JSON itself."""
+    rep = _load_json(a.scan)
+    if rep is None:
+        return 1
+    try:
+        import summary
+    except ImportError:
+        return _err('summary.py not found next to agents_doctor.py')
+    files = {}
+    for key, value in (('human', a.human), ('report', a.report),
+                       ('scan', a.scan)):
+        if value:
+            files[key] = _shown_path(value, rep.get('root'))
+    print(summary.render(summary.build(rep, a.lang, files=files)))
+    return 0
 
 
 def cmd_fix(a):
@@ -639,6 +728,20 @@ def build_parser():
     pa.add_argument('--report', default=None, metavar='AUDIT.md',
                     help='also write a markdown report '
                          '(needs report_generator.py)')
+    pa.add_argument('--human', default=None, metavar='REPORT.md',
+                    help='also write the plain-language report for '
+                         'non-technical readers (needs report_human.py)')
+    pa.add_argument('--lang', choices=('ru', 'en'), default='en',
+                    help='language of the plain-language report and of the '
+                         'summary (default: en)')
+    pa.add_argument('--sessions', type=int, default=10, metavar='N',
+                    help='agent sessions per day for the monthly token '
+                         'estimate of the plain-language report (default: 10)')
+    pa.add_argument('--summary', action='store_true',
+                    help='print the short digest of the scan (gate statuses '
+                         'with reasons, the findings that matter, where to '
+                         'start) instead of leaving the agent to read the '
+                         'whole JSON')
     pa.add_argument('--runtime', action='store_true',
                     help='opt-in runtime checks after the scan: CLI '
                          'binaries of detected harnesses (--version, '
@@ -664,10 +767,30 @@ def build_parser():
     pc.add_argument('old', help='older scan.json (baseline)')
     pc.set_defaults(func=cmd_compare)
 
-    pe = sub.add_parser('explain', help='print one typed finding in full')
+    pe = sub.add_parser(
+        'explain', help='print one finding as a short card: what, where, '
+                        'what to do (--raw prints the full record)')
     pe.add_argument('scan', help='scan.json from an audit')
     pe.add_argument('fid', help='finding id, e.g. SEC-001')
+    pe.add_argument('--lang', choices=('ru', 'en'), default='en',
+                    help='language of the card (default: en)')
+    pe.add_argument('--raw', action='store_true',
+                    help='print the full finding record with its evidence '
+                         '(the pre-digest output)')
     pe.set_defaults(func=cmd_explain)
+
+    pm = sub.add_parser(
+        'summary', help='print the short digest of a finished scan')
+    pm.add_argument('scan', help='scan.json from an audit')
+    pm.add_argument('--lang', choices=('ru', 'en'), default='en',
+                    help='language of the digest (default: en)')
+    pm.add_argument('--human', default=None, metavar='REPORT.md',
+                    help='plain-language report written next to the scan, '
+                         'named in the digest')
+    pm.add_argument('--report', default=None, metavar='AUDIT.md',
+                    help='technical report written next to the scan, '
+                         'named in the digest')
+    pm.set_defaults(func=cmd_summary)
 
     pf = sub.add_parser(
         'fix', help='plan a guarded fix for one finding '

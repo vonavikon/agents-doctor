@@ -2794,7 +2794,7 @@ function renderHistoryTab() {
       const li = el('li', {});
       li.append(el('span', {
         class: 'mono',
-        text: (r.check_id || r.fid || '?') + (r.harness ? ' @' + r.harness : '') + ' [' + (r.gate || '?') + ']',
+        text: (r.fid || r.check_id || '?') + (r.check_id && r.fid ? ' ' + r.check_id : '') + (r.harness ? ' @' + r.harness : '') + ' [' + (r.gate || '?') + ']',
       }));
       li.append(el('span', { class: 'mono subtle', text: '  ' + (r.reasons || []).join('; ') }));
       ul.append(li);

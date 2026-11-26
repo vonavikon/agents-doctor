@@ -352,11 +352,14 @@ def plan(rep, fid):
     would leave the audited root. No destructive command is ever
     generated for an unsupported finding.
 
-    Findings that carry a check_id (harness adapters, ТЗ 13.3) are
-    planned through the CHECK_ID_FIXES registry: a registered autofix
-    becomes a trash_move step, a registered manual entry becomes
-    display-only steps with autofix_available=False, an unregistered
-    check_id raises UnsupportedError naming it.
+    Findings that carry a check_id registered in CHECK_ID_FIXES
+    (harness adapters, the adapter contract) are planned through that
+    registry: a registered autofix becomes a trash_move step, a
+    registered manual entry becomes display-only steps with
+    autofix_available=False.
+    Every finding carries a check_id (gate findings too, it names the
+    finding type); one the registry does not know falls through to the
+    gate routes below, which plan by the shape of the evidence.
     """
     finding = None
     for f in rep.get('findings_detailed') or []:
@@ -372,11 +375,11 @@ def plan(rep, fid):
     evidence = finding.get('evidence') or []
     prefix = str(fid).split('-', 1)[0]
 
-    # 0) harness-adapter findings carry a stable check_id (ТЗ 13.3):
-    # the registry decides; a check_id without an entry is refused the
-    # same way every unsupported finding is
+    # 0) harness-adapter findings carry a stable check_id (the adapter
+    # contract): the registry decides. Gate findings carry a check_id as
+    # well; one the registry does not know is planned by the gate routes below
     check_id = str(finding.get('check_id') or '')
-    if check_id:
+    if check_id and check_id in CHECK_ID_FIXES:
         return _plan_check_id(root, fid, check_id, evidence)
 
     # 1) confirmed-unused junk -> move into the trash dir
@@ -570,8 +573,9 @@ def plan(rep, fid):
 
     raise UnsupportedError(
         '%s: no supported automatic fix for this finding (title %r, gate %s, '
-        'category %s); apply its recommendation by hand'
-        % (fid, title, finding.get('gate'), finding.get('category')))
+        'category %s%s); apply its recommendation by hand'
+        % (fid, title, finding.get('gate'), finding.get('category'),
+           ', check_id %s' % check_id if check_id else ''))
 
 
 def _trash_step(root, target, note, risk=RISK_SAFE):

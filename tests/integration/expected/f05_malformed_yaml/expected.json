@@ -1,6 +1,6 @@
 {
-  "description": "Broken JSON config plus a SKILL.md whose frontmatter never closes its quote. G5 reads fail with PyYAML and unknown with the flat fallback parser, so both are accepted.",
-  "gates": {"1": "pass", "2": "fail", "3": "pass", "4": "warn", "6": "warn", "7": "not_applicable", "8": "pass", "9": "pass"},
+  "description": "Broken JSON config plus a SKILL.md whose frontmatter never closes its quote. G5 reads fail with PyYAML and unknown with the flat fallback parser, so both are accepted. No git in the fixture: secret prevention is not applicable, so G6 has no hook to ask for.",
+  "gates": {"1": "pass", "2": "fail", "3": "pass", "4": "warn", "6": "pass", "7": "not_applicable", "8": "pass", "9": "pass"},
   "gates_any": {"5": ["fail", "unknown"]},
   "counts": {"secrets": 0, "junk_files": 0, "junk_dirs": 0, "empty_dirs": 0, "duplicates": 0, "large_files": 0, "context_drift": 0, "dup_checkouts": 0},
   "findings_schema": true

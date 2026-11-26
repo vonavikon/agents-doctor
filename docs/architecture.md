@@ -7,9 +7,12 @@ agents-doctor splits the job in two:
 1. A deterministic scanner. Pure Python stdlib, no dependencies, offline.
    It walks the workspace, collects facts and writes JSON. Runs are
    reproducible: the same tree produces the same findings.
-2. An LLM interpreter (optional). The skill reads the JSON, filters false
-   positives, explains findings and writes the markdown report. The model
-   judges which facts are findings; it never collects facts itself.
+2. An LLM interpreter (optional). The skill runs the audit command,
+   reads the short digest it prints and explains the findings to the
+   user in plain words, in the user's language. The model adds nothing
+   and drops nothing: the scanner decides what is a finding, by fixed
+   rules, and writes both reports itself. The model never collects
+   facts and never reads the scan JSON.
 
 This mirrors how production audit tools place the LLM strictly above
 ready findings rather than in the collection path (see
@@ -64,11 +67,16 @@ telemetry. The only network socket agents-doctor ever opens is the
 localhost listener of `ui` — and file previews there are masked by the
 same secret rules before they reach the browser.
 
-When used through an AI harness (Claude Code, Z Code), the model sees the
-scan JSON as part of its context. Secret values are already redacted at
-this point — the model sees only masks, fingerprints, and metadata. What
-the harness does with this context is governed by the harness's own
-privacy policy, not by agents-doctor.
+When used through an AI harness (Claude Code, Z Code), the model does
+not read the scan JSON. The skill runs one audit command and reads the
+short digest the command prints (`summary.py`): gate statuses with
+reasons, the findings that matter with their file and line, where to
+start. The digest carries no secret value (redacted upstream), no
+absolute path of the machine and no quoted line from the user's files.
+It says whether the audited folder is in git and names everything that
+was not checked, with the reason, so the agent never has to guess.
+What the harness does with this context is governed by the harness's
+own privacy policy, not by agents-doctor.
 
 ## Module map
 
@@ -76,16 +84,19 @@ All scanner modules live in `skills/agents-doctor/scripts/`:
 
 | Module | Role |
 |---|---|
-| `audit_scan.py` | Scanner entry: walks the workspace, collects facts (files, git metadata, harness states, junk, duplicates), calls the gate engine, writes scan JSON. |
+| `audit_scan.py` | Scanner entry: walks the workspace, collects facts (files, git metadata of the repositories sitting in the folder and of the audited folder itself when it is one, where each file with a key sits in git, harness states, junk, duplicates), calls the gate engine, writes scan JSON. |
 | `harness/` | Registry + adapters + detection + collect bridge + external plugins. See [ADAPTER-GUIDE.md](ADAPTER-GUIDE.md) and [HARNESS-MATRIX.md](HARNESS-MATRIX.md). |
 | `instructions/` | Instruction discovery, loading simulation, cross-source conflict detection (contradiction, duplication, divergence). |
 | `secret_scanner.py` | Secret detection and redaction. The only place raw secret values ever exist; everything downstream sees masks and fingerprints. |
 | `enrich.py` | Extra facts the gates need: config parse integrity, heavy dirs outside git, junk classification, harness activity states, SKILL.md frontmatter health. |
-| `gates.py` | Gate engine. `GATE_DEFS` holds the nine gates as declarative definitions; `GATE_POLICY` is the single source of thresholds. Turns facts — including adapter findings — into gates and typed findings. |
-| `report_model.py` | The finding/gate data model (schema 1.0). Validates severity, status, evidence, confidence; separates the severity and status axes. Adapter findings carry an extra stable `check_id` and `harness` field. |
-| `report_generator.py` | Writes the markdown report (`AUDIT-<date>.md`) from a scan JSON. |
+| `gates.py` | Gate engine. `GATE_DEFS` holds the nine gates as declarative definitions; `GATE_POLICY` is the single source of thresholds. Turns facts — including adapter findings — into gates and typed findings. A rule that did not run or does not apply carries a reason code from the glossary. |
+| `report_model.py` | The finding/gate data model (schema 1.0). Validates severity, status, evidence, confidence; separates the severity and status axes. Every finding carries a stable `check_id` (its type); adapter findings add `harness`. |
+| `glossary.py` | The plain-language names: nine gates, every finding type, the reason a check did not run. One source for the digest, both reports and `references/glossary.md`. |
+| `summary.py` | The digest of a scan: what the agent reads instead of the scan JSON. Names findings through the glossary, shows each one's place as a path relative to the audited folder, groups a long tail by type, picks where to start. |
+| `report_human.py` | The plain-language report for non-technical readers (English or Russian): the main problem first, every finding with its place and what to do, what can be made better, where to start. |
+| `report_generator.py` | The technical report (`AUDIT.md`) from a scan JSON: gate results with the reason wherever a check did not run, findings with location and what to do. |
 | `sarif.py` | Exports findings as SARIF 2.1.0 for CI code viewers. |
-| `agents_doctor.py` | CLI entry: `audit`, `sarif`, `compare`, `explain`, `fix`, `simulate`, `ui`. |
+| `agents_doctor.py` | CLI entry: `audit` (with `--report`, `--human`, `--summary`), `summary`, `sarif`, `compare`, `explain`, `fix`, `history`, `policy`, `watch`, `simulate`, `ui`. |
 | `remediate.py` | Remediation planner: fid-based and check_id-based fixes, crash recovery, concurrency lock. Plan-only by default; `--apply` moves files to `.agents-doctor-trash/`. |
 | `ui/` | Local web UI (localhost server + static SPA). Read-only over one scan.json. |
 
@@ -109,16 +120,19 @@ workspace tree + home dir
         |
         v
   gates.py (GATE_DEFS + GATE_POLICY)
-        |---- nine gates: status + evidence + confidence
+        |---- nine gates: status + reason + evidence + confidence
         |---- typed findings: fid (counter), check_id (stable),
         |     severity, status, recommendation
         v
   scan.json  (schema: docs/schema/report-schema.json)
         |
-        +---- report_generator.py ---- AUDIT-<date>.md   (skill layer narrates)
-        +---- sarif.py              ---- scan.sarif      (CI viewers)
-        +---- ui/server.py          ---- local browser explorer
-        +---- remediate.py          ---- fix plans / trash moves / recovery
+        +---- summary.py ---------- digest (stdout, --summary): what
+        |                             the agent reads; glossary names
+        +---- report_human.py ------ REPORT.md    (plain words, EN/RU)
+        +---- report_generator.py -- AUDIT.md     (technical report)
+        +---- sarif.py ------------- scan.sarif   (CI viewers)
+        +---- ui/server.py --------- local browser explorer
+        +---- remediate.py --------- fix plans / trash moves / recovery
         +---- next run: --baseline compares fingerprints
 ```
 

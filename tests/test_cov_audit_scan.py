@@ -13,6 +13,10 @@ delegates to the real implementation for every name except the one
 under test, so only the guard being tested sees the error. git runs
 only inside throwaway fixture directories, with GIT_OPTIONAL_LOCKS=0
 and a per-command fixture identity.
+
+The scanner-behaviour classes at the end (what the scan records about
+the audited folder, about repositories, skills, keys and duplicates)
+run on the temp-folder bases of tests/integration/fixtures.py.
 """
 import errno
 import json
@@ -31,8 +35,18 @@ from unittest import mock
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'skills' / 'agents-doctor' / 'scripts'
 sys.path.insert(0, str(SCRIPTS))
+sys.path.insert(0, str(Path(__file__).resolve().parent / 'integration'))
 
 import audit_scan  # noqa: E402
+import gates  # noqa: E402
+import report_human  # noqa: E402
+import summary  # noqa: E402
+from fixtures import FAKE_KEY, GitCase, TmpCase, commit_git  # noqa: E402
+# report lookups, under the names the scanner tests were written with
+from fixtures import by_check as _by_check, gate_of as _gate  # noqa: E402
+from fixtures import evidence_values as _paths  # noqa: E402
+from fixtures import mcp_with_key as _mcp_with_key  # noqa: E402
+from fixtures import rule_of as _rule  # noqa: E402
 
 
 def sim_error(message):
@@ -458,8 +472,12 @@ class FsErrorGuards(AuditScanCase):
         # unreadable top-level file keeps its place with metadata only
         top = next(t for t in rep['top_level'] if t['name'] == 'statfail_top.bin')
         self.assertEqual((top['kind'], top['size_bytes']), ('file', 0))
-        # both duplicate pairs are broken by the failures
-        self.assertEqual(rep['duplicates'], [])
+        # the .env pair is broken by the open failure. The p/q pair is
+        # settled by the single shared read: a short file is read in full
+        # the first time, so the simulated read_bytes failure never fires
+        self.assertEqual(rep['duplicates'], [
+            {'size_bytes': 1200,
+             'files': ['dup%sp.txt' % os.sep, 'dup%sq.txt' % os.sep]}])
         # locked.env is never read; open.env still reports its secret
         self.assertEqual([s['path'] for s in rep['secrets']],
                          ['dup%sopen.env' % os.sep])
@@ -671,6 +689,452 @@ class MainCli(AuditScanCase):
         self.assertIn('skipped symlinks pointing outside the root: 1', out)
         self.assertIn("profile symlink/outside skips: 1 ['outside_link.txt']",
                       err)
+
+
+# --- what the scan records about skills folders ---------------------------------
+
+class SkillsFolderCoverageTests(TmpCase):
+    """The skill search records what it covered: a folder cut by the
+    per-folder cap is reported, a normal scan records the folders read."""
+
+    def test_truncated_folder_reports_an_incomplete_check(self):
+        for i in range(3):
+            self.put(self.home, '.zcode/cli/plugins/cache/p%d/v1/s/SKILL.md' % i,
+                     '---\nname: s%d\ndescription: "Use when asked"\n---\n' % i)
+        with mock.patch.object(audit_scan, 'SKILLS_FOLDER_CAP', 2):
+            rep = audit_scan.scan(self.root, self.home, False)
+        self.assertEqual(len(rep['skills']['entries']), 2)
+        self.assertEqual(rep['skills']['coverage']['truncated'],
+                         [{'location': 'plugins-cache', 'scanned': 2,
+                           'found': 3, 'cap': 2}])
+        hits = _by_check(rep, 'SKL_CHECK_INCOMPLETE')
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0]['status'], 'unknown')
+        self.assertEqual(_gate(rep, 'G5')['status'], 'unknown')
+
+    def test_folder_cap_is_far_above_the_old_200(self):
+        # 200 silently dropped the tail of a real plugin cache
+        self.assertGreaterEqual(audit_scan.SKILLS_FOLDER_CAP, 1000)
+
+    def test_coverage_is_recorded_on_a_normal_scan(self):
+        self.put(self.root, '.agents/skills/ok/SKILL.md',
+                 '---\nname: ok\ndescription: "Use when asked"\n---\n')
+        rep = audit_scan.scan(self.root, self.home, False)
+        cov = rep['skills']['coverage']
+        self.assertEqual(cov['checked'], ['project-agents'])
+        self.assertEqual((cov['failed'], cov['truncated']), ([], []))
+
+
+# --- repositories found by the walk ---------------------------------------------
+
+class GitRootsRecordingTests(TmpCase):
+
+    def test_scan_lists_every_repository_folder(self):
+        for rel in ('projects/a', 'projects/b', 'projects/a/vendor/lib'):
+            (self.root / rel / '.git').mkdir(parents=True)
+            (self.root / rel / '.git' / 'HEAD').write_text('ref: refs/heads/main',
+                                                           encoding='utf-8')
+        # a .git file marks a repository too
+        self.put(self.root, 'projects/wt/.git', 'gitdir: ../a/.git/worktrees/wt')
+        (self.root / 'projects' / 'plain').mkdir()
+        rep = audit_scan.scan(self.root, self.home, False)
+        sep = '\\' if sys.platform == 'win32' else '/'
+        self.assertEqual(rep['git_roots'], sorted([
+            sep.join(('projects', 'a')), sep.join(('projects', 'b')),
+            sep.join(('projects', 'wt')),
+            sep.join(('projects', 'a', 'vendor', 'lib'))]))
+
+    def test_no_repository_gives_an_empty_list(self):
+        rep = audit_scan.scan(self.root, self.home, False)
+        self.assertEqual(rep['git_roots'], [])
+
+
+# --- dedup: read once ----------------------------------------------------------
+
+class DedupReadOnceTests(TmpCase):
+
+    def _pair(self, rel_a, rel_b, size, name_a='a.bin', name_b='b.bin'):
+        data = bytes(range(256)) * (size // 256) + b'x' * (size % 256)
+        for rel, name in ((rel_a, name_a), (rel_b, name_b)):
+            p = self.root / rel / name
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(data)
+
+    def _scan_counting(self):
+        calls = []
+        real = Path.read_bytes
+
+        def counting(self_path, *a, **k):
+            calls.append(self_path.name)
+            return real(self_path, *a, **k)
+
+        with mock.patch.object(Path, 'read_bytes', counting):
+            rep = audit_scan.scan(self.root, self.home, False)
+        # only the pair's own files: the scan reads its own small config
+        # file the same way, which is not the dedup stage
+        watched = {'a.bin', 'b.bin', 'a.md', 'b.md'}
+        return rep, [c for c in calls if c in watched]
+
+    def test_short_pair_is_settled_without_a_second_open(self):
+        self._pair('dup', 'copy', 1500)
+        rep, calls = self._scan_counting()
+        self.assertEqual(len(rep['duplicates']), 1)
+        self.assertEqual(calls, [])
+
+    def test_text_candidate_pair_is_settled_without_a_second_open(self):
+        self._pair('dup', 'copy', 9000, 'a.md', 'b.md')
+        rep, calls = self._scan_counting()
+        self.assertEqual(len(rep['duplicates']), 1)
+        self.assertEqual(calls, [])
+
+    def test_big_binary_pair_is_still_read_in_full_once_each(self):
+        self._pair('dup', 'copy', 9000)
+        rep, calls = self._scan_counting()
+        self.assertEqual(len(rep['duplicates']), 1)
+        self.assertEqual(sorted(calls), ['a.bin', 'b.bin'])
+
+    def test_second_stage_failure_breaks_a_big_pair(self):
+        self._pair('dup', 'copy', 9000)
+        real = Path.read_bytes
+
+        def failing(self_path, *a, **k):
+            if self_path.name == 'b.bin':
+                raise OSError('simulated read failure')
+            return real(self_path, *a, **k)
+
+        with mock.patch.object(Path, 'read_bytes', failing):
+            rep = audit_scan.scan(self.root, self.home, False)
+        self.assertEqual(rep['duplicates'], [])
+
+    def test_different_tails_are_not_duplicates(self):
+        head = bytes(range(256)) * 16
+        for rel, tail in (('dup', b'AAAA'), ('copy', b'BBBB')):
+            p = self.root / rel / 'a.bin'
+            p.parent.mkdir(parents=True)
+            p.write_bytes(head + tail)
+        rep, _ = self._scan_counting()
+        self.assertEqual(rep['duplicates'], [])
+
+
+# --- without git ----------------------------------------------------------------
+
+class NoGitScanTests(TmpCase):
+    """A folder without git and a key in a config file, end to end."""
+
+    def test_folder_without_git_and_a_key_in_mcp_json(self):
+        self.put(self.root, '.mcp.json',
+                 '{\n  "mcpServers": {\n    "demo": {\n      "url": "https://x.invalid/mcp",\n'
+                 '      "headers": { "Authorization": "Bearer %s" }\n    }\n  }\n}\n'
+                 % FAKE_KEY)
+        rep = audit_scan.scan(self.root, self.home, False)
+        gate = _gate(rep, 'G6')
+        self.assertEqual(gate['status'], 'fail')
+        self.assertEqual(_rule(gate, 'exposed-secrets')['status'], 'fail')
+        exposed = [f for f in rep['findings_detailed']
+                   if f['gate'] == 'G6' and f['status'] == 'fail']
+        self.assertEqual(len(exposed), 1)
+        self.assertEqual(exposed[0]['evidence'][0]['file'], '.mcp.json')
+        self.assertIsInstance(exposed[0]['evidence'][0]['line'], int)
+        self.assertEqual(exposed[0]['evidence'][0]['mask'], 'sk-***')
+        self.assertEqual(_rule(gate, 'secret-prevention')['status'],
+                         'not_applicable')
+        text = json.dumps(rep['findings_detailed'])
+        self.assertNotIn('secret-prevention mechanism found', text)
+        self.assertNotIn('pre-commit', text)
+        # the key itself never leaves the scanner
+        self.assertNotIn(FAKE_KEY, json.dumps(rep))
+
+
+# --- short instruction files ----------------------------------------------------
+
+class ShortInstructionTests(TmpCase):
+    """A pointer-sized instruction file is a hint, a big one is a warning.
+    Size is counted in bytes: a few very long lines make a big file."""
+
+    LINE = ('This folder was created in 2019 to collect the regional '
+            'statistics of the office and to keep them in one place.\n')
+
+    def _scan(self, lines):
+        self.put(self.root, 'AGENTS.md', '# Project\n\n' + self.LINE * lines)
+        return audit_scan.scan(self.root, self.home, False)
+
+    def test_pointer_sized_file_is_a_hint(self):
+        rep = self._scan(2)
+        hints = _by_check(rep, 'RUL_SHORT_FILE_HINT')
+        self.assertEqual([f['status'] for f in hints], ['pass'])
+        self.assertEqual([f['severity'] for f in hints], ['info'])
+        self.assertEqual(_by_check(rep, 'RUL_MOSTLY_NOISE'), [])
+        self.assertEqual(_rule(_gate(rep, 'G3'), 'content-quality')['status'],
+                         'pass')
+
+    def test_file_just_over_the_limit_is_a_warning(self):
+        rep = self._scan(19)
+        self.assertGreater(len(self.LINE) * 19,
+                           gates.GATE_POLICY['SHORT_INSTRUCTION_BYTES'])
+        self.assertEqual(_by_check(rep, 'RUL_SHORT_FILE_HINT'), [])
+        noise = _by_check(rep, 'RUL_MOSTLY_NOISE')
+        self.assertEqual([f['status'] for f in noise], ['warn'])
+        self.assertEqual(_rule(_gate(rep, 'G3'), 'content-quality')['status'],
+                         'warn')
+
+    def test_size_in_bytes_not_in_lines(self):
+        # 40 KB on a few lines: short by line count, big by bytes
+        rep = self._scan(400)
+        self.assertEqual(_by_check(rep, 'RUL_SHORT_FILE_HINT'), [])
+        self.assertEqual(len(_by_check(rep, 'RUL_MOSTLY_NOISE')), 1)
+
+    def test_is_short_judged_by_bytes_only(self):
+        self.assertTrue(gates.is_short_instruction({'size_bytes': 0}))
+        self.assertTrue(gates.is_short_instruction(
+            {'size_bytes': gates.GATE_POLICY['SHORT_INSTRUCTION_BYTES'] - 1}))
+        self.assertFalse(gates.is_short_instruction(
+            {'size_bytes': gates.GATE_POLICY['SHORT_INSTRUCTION_BYTES']}))
+        # a report made before the size was recorded: not judged short
+        self.assertFalse(gates.is_short_instruction({'lines': 4}))
+
+
+class ToolOwnFoldersTests(TmpCase):
+    """The folders the tool creates under the audited root are not the
+    user's loose data."""
+
+    def test_tool_folders_are_not_reported_as_loose(self):
+        self.put(self.root, 'AGENTS.md', '# Project\n')
+        self.put(self.root, '.agents-doctor/scan.json', '{}')
+        self.put(self.root, '.agents-doctor/AUDIT.md', '# Audit\n')
+        self.put(self.root, '.agents-doctor-trash/old.md', '# Old\n')
+        self.put(self.root, 'notes/a.md', '# Notes\n')
+        rep = audit_scan.scan(self.root, self.home, False)
+        loose = _by_check(rep, 'DIR_LOOSE_TOP_FOLDERS')
+        self.assertEqual(len(loose), 1)
+        self.assertEqual([e['path'] for e in loose[0]['evidence']], ['notes'])
+
+
+# --- a copy of the plugin's own source in the folder ----------------------------
+
+class OwnSourceSkipCounterTests(TmpCase):
+    """Files that would have been read for keys but lie in a copy of the
+    plugin's own source are left out and counted."""
+
+    SCRIPTS = '.agents/skills/agents-doctor/scripts'
+
+    def test_files_of_the_plugin_source_are_counted(self):
+        for rel in ('audit_scan.py', 'secret_rules.py', 'ui/server.py',
+                    'glossary.md'):
+            self.put(self.root, self.SCRIPTS + '/' + rel, '# the plugin\n')
+        self.put(self.root, 'notes/a.md', '# notes\n')
+        rep = audit_scan.scan(self.root, self.home, False)
+        # the four files of the copy; the user's own file is still read
+        self.assertEqual(rep['stats']['own_source_skipped'], 4)
+
+    def test_nothing_is_counted_without_such_a_copy(self):
+        self.put(self.root, 'notes/a.md', '# notes\n')
+        rep = audit_scan.scan(self.root, self.home, False)
+        self.assertEqual(rep['stats']['own_source_skipped'], 0)
+
+
+# --- the audited folder itself is a repository -----------------------------------
+
+class RootRepoReadTests(GitCase):
+    """The most common workspace is a project folder that is a git
+    repository. Before, the scanner read the git side of the clones
+    inside it and never its own."""
+
+    def _scan(self):
+        return audit_scan.scan(self.root, self.home, False)
+
+    def test_the_folder_is_listed_as_a_repository_and_read(self):
+        self.put(self.root, 'AGENTS.md', '# Rules\n')
+        self.commit('AGENTS.md')
+        rep = self._scan()
+        first = rep['top_level'][0]
+        self.assertEqual((first['name'], first['kind']), ('.', 'repo'))
+        self.assertTrue(first['extra']['gitignore'] is False)
+        self.assertEqual(_by_check(rep, 'SEC_GIT_SIDE_UNVERIFIED'), [])
+        self.assertEqual(_by_check(rep, 'SEC_PREVENTION_UNVERIFIED'), [])
+        self.assertEqual(_rule(_gate(rep, 'G6'), 'tracked-secrets')['status'], 'pass')
+
+    def test_a_secret_scan_hook_of_the_folder_counts(self):
+        hook = self.root / '.git' / 'hooks' / 'pre-commit'
+        hook.write_text('#!/bin/sh\nexec gitleaks protect --staged\n',
+                        encoding='utf-8')
+        rep = self._scan()
+        self.assertEqual(_rule(_gate(rep, 'G6'), 'secret-prevention')['status'],
+                         'pass')
+        self.assertEqual(_by_check(rep, 'SEC_PREVENTION_ABSENT'), [])
+
+    def test_uncommitted_work_of_the_folder_is_named(self):
+        self.put(self.root, 'AGENTS.md', '# Rules\n')
+        self.commit('AGENTS.md')
+        self.put(self.root, 'wip.txt', 'wip\n')
+        rep = self._scan()
+        hits = _by_check(rep, 'GIT_UNCOMMITTED_WORK')
+        self.assertEqual([f['title'] for f in hits],
+                         ['Uncommitted work in the audited folder'])
+        self.assertEqual(hits[0]['evidence'][0]['repo'], '.')
+        self.assertEqual([f['title'] for f in _by_check(rep, 'GIT_NO_GITIGNORE')],
+                         ['No .gitignore in the audited folder'])
+
+    def test_deeper_repositories_stay_unverified(self):
+        # a clean folder with a clone inside: the clean result covers
+        # the folder only, the clone's git side was never read
+        self.put(self.root, '.gitignore', 'projects/\n')
+        self.commit('.gitignore')
+        deeper = self.root / 'projects' / 'a'
+        deeper.mkdir(parents=True)
+        commit_git(deeper, 'init', '-q')
+        rep = self._scan()
+        side = _by_check(rep, 'SEC_GIT_SIDE_UNVERIFIED')
+        self.assertEqual(len(side), 1)
+        self.assertNotIn('.', side[0]['evidence'][0]['paths'])
+        prevention = _by_check(rep, 'SEC_PREVENTION_UNVERIFIED')
+        self.assertEqual(prevention[0]['evidence'][0]['paths'],
+                         side[0]['evidence'][0]['paths'])
+        # a clean result covers only the folder that was read
+        self.assertEqual(
+            _rule(_gate(rep, 'G6'), 'tracked-secrets')['status'], 'unknown')
+        self.assertEqual(
+            _rule(_gate(rep, 'G7'), 'worktree-clean')['status'], 'unknown')
+
+
+class RootRepoFolderTests(GitCase):
+
+    def _scan(self):
+        return audit_scan.scan(self.root, self.home, False)
+
+    def test_tracked_and_ignored_folders_are_not_loose(self):
+        self.put(self.root, 'src/main.py', 'print(1)\n')
+        self.put(self.root, 'notes/a.md', '# a\n')
+        self.put(self.root, '.gitignore', 'scratch/\n')
+        self.put(self.root, 'scratch/x.txt', 'x\n')
+        self.commit('src', '.gitignore')
+        rep = self._scan()
+        loose = _by_check(rep, 'DIR_LOOSE_TOP_FOLDERS')
+        self.assertEqual(_paths(rep, 'DIR_LOOSE_TOP_FOLDERS', 'path'), ['notes'])
+        self.assertIn('audited folder', loose[0]['description'])
+
+    def test_a_tracked_large_file_is_not_without_backup(self):
+        self.put_bytes('data.bin', bytes(5 * 1024 * 1024 + 1))
+        self.commit('data.bin')
+        self.put_bytes('dump.bin', bytes(5 * 1024 * 1024 + 2))
+        rep = self._scan()
+        self.assertEqual(_paths(rep, 'HLTH_LARGE_FILE_OUTSIDE_GIT', 'path'),
+                         ['dump.bin'])
+        self.assertEqual(_paths(rep, 'GIT_TRACKED_FILE_TOO_BIG', 'file'),
+                         ['data.bin'])
+
+    def test_a_repository_kept_out_by_gitignore_is_a_chosen_layout(self):
+        self.put(self.root, '.gitignore', 'vendor/\n')
+        self.commit('.gitignore')
+        (self.root / 'vendor' / 'lib').mkdir(parents=True, exist_ok=True)
+        commit_git(self.root / 'vendor' / 'lib', 'init', '-q')
+        rep = self._scan()
+        self.assertEqual(_by_check(rep, 'DIR_NESTED_REPOSITORY'), [])
+        self.assertEqual(rep['top_level'][0]['extra']['nested_repos'],
+                         [str(Path('vendor') / 'lib')])
+        self.assertEqual(
+            [os.path.normpath(p) for p in
+             rep['top_level'][0]['extra']['nested_repos_ignored']],
+            [str(Path('vendor') / 'lib')])
+
+    def test_a_nested_repository_is_reported_for_the_folder(self):
+        lib = self.root / 'lib'
+        lib.mkdir()
+        commit_git(lib, 'init', '-q')
+        rep = self._scan()
+        hits = _by_check(rep, 'DIR_NESTED_REPOSITORY')
+        self.assertEqual([f['title'] for f in hits],
+                         ['Nested repository in the audited folder: lib'])
+        self.assertEqual(hits[0]['evidence'][0]['repo'], '.')
+
+
+class RootRepoDigestTests(GitCase):
+    """What the agent and the reader see when the audited folder is a
+    repository: the advice about a key follows the facts, one step
+    names all its places, the folder itself is named in words."""
+
+    def _digest(self, lang='ru'):
+        rep = audit_scan.scan(self.root, self.home, False)
+        return rep, summary.build(rep, lang)
+
+    def test_an_ignored_key_is_a_hint_not_an_alarm(self):
+        self.put(self.root, '.gitignore', '.mcp.json\n.agents-doctor/\n')
+        self.commit('.gitignore')
+        _mcp_with_key(self)
+        _rep, digest = self._digest()
+        text = summary.render(digest)
+        self.assertIn('В файле настроек лежит ключ (в Git он не попадает)', text)
+        self.assertIn('где: .mcp.json:5', text)
+        self.assertIn('[заметно, стоит посмотреть]', text)
+        self.assertIn('это обычное место для личных настроек', text)
+        self.assertNotIn('уберите его из файла', text)
+        # a hint is not a step
+        self.assertFalse([s for s in digest['start']
+                          if s['code'] == 'SEC_EXPOSED_SECRET'])
+        # the folder is in git and keeps the tool's reports out of it
+        self.assertIn('Сама папка хранится в Git.', text)
+        self.assertNotIn('Отчёты аудита лежат', text)
+
+    def test_a_tracked_key_is_the_first_step(self):
+        _mcp_with_key(self)
+        self.commit('.mcp.json')
+        _rep, digest = self._digest()
+        self.assertEqual(digest['start'][0]['code'], 'SEC_EXPOSED_SECRET')
+        self.assertEqual(digest['start'][0]['places'], ['.mcp.json:5'])
+        text = summary.render(digest)
+        self.assertIn('В файле, который хранится в Git, лежит пароль или ключ',
+                      text)
+        self.assertIn('уберите файл из проекта и из его истории', text)
+        # the reports folder is not kept out of git yet
+        self.assertIn('Отчёты аудита лежат в папке .agents-doctor', text)
+
+    def _three_keys(self):
+        servers = {name: {'url': 'https://x.invalid/' + name,
+                          'headers': {'Authorization': 'Bearer %s' % FAKE_KEY}}
+                   for name in ('a', 'b', 'c')}
+        return self.put(self.root, '.mcp.json',
+                        json.dumps({'mcpServers': servers}, indent=2))
+
+    def test_equal_steps_are_one_step_with_every_place(self):
+        self._three_keys()
+        rep = audit_scan.scan(self.root, self.home, False)
+        self.assertEqual(len(rep['secrets']), 3)
+        digest = summary.build(rep, 'ru')
+        steps = [s for s in digest['start'] if s['code'] == 'SEC_EXPOSED_SECRET']
+        self.assertEqual(len(steps), 1)
+        self.assertEqual(len(steps[0]['places']), 3)
+        start = summary.render(digest).split('С ЧЕГО НАЧАТЬ')[1]
+        self.assertEqual(start.count('Добавьте его в .gitignore'), 1)
+        # the plain report groups the same way in its "start" section
+        report = report_human.generate_human_markdown(rep, 'ru')
+        start = report.rsplit('Начните с этого:', 1)[1].split('Дальше:')[0]
+        self.assertEqual(start.count('Добавьте его в .gitignore'), 1)
+        self.assertEqual(start.count('строка'), 3)
+        # and its short version says what to do about this kind of key
+        self.assertIn('Начните с этого: файл ещё не в Git', report)
+
+    def test_the_folder_itself_is_named_in_words(self):
+        self.put(self.root, 'AGENTS.md', '# Rules\n')
+        self.commit('AGENTS.md')
+        self.put(self.root, 'wip.txt', 'wip\n')
+        rep = audit_scan.scan(self.root, self.home, False)
+        text = summary.render(summary.build(rep, 'ru'))
+        self.assertIn('где: самой папки', text)
+        self.assertNotIn('где: .\n', text)
+        report = report_human.generate_human_markdown(rep, 'ru')
+        self.assertIn('Есть несохранённая работа: самой папки', report)
+
+    def test_unchecked_folders_are_named_with_the_rest_counted(self):
+        self.put(self.root, '.gitignore', 'projects/\n')
+        self.commit('.gitignore')
+        for name in ('a', 'b', 'c'):
+            (self.root / 'projects' / name).mkdir(parents=True, exist_ok=True)
+            commit_git(self.root / 'projects' / name, 'init', '-q')
+        rep = audit_scan.scan(self.root, self.home, False)
+        text = summary.render(summary.build(rep, 'ru'))
+        self.assertIn('Папок с Git, которые не проверялись (лежат глубже '
+                      'первого уровня): 3.', text)
+        self.assertIn('где: projects/a, projects/b, projects/c', text)
+        self.assertEqual(text.count('и ещё '), 0)
 
 
 if __name__ == '__main__':

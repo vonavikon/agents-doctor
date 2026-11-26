@@ -1,7 +1,9 @@
 """Tests for the Claude Code harness adapter
 (skills/agents-doctor/scripts/harness/adapters/claude_code.py).
 
-Everything runs on temp directories via pathlib; stdlib only.
+Everything runs on temp directories via pathlib; stdlib only. The
+helpers shared with the other test modules come from
+tests/integration/fixtures.py.
 """
 import json
 import sys
@@ -10,9 +12,11 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'skills' / 'agents-doctor' / 'scripts'))
+sys.path.insert(0, str(Path(__file__).resolve().parent / 'integration'))
 
 from harness import adapter_ids, get_adapter
 from harness.base import HarnessContext
+from fixtures import put  # noqa: E402
 
 
 class ClaudeCodeAdapterTestCase(unittest.TestCase):
@@ -387,6 +391,89 @@ class TestValidate(ClaudeCodeAdapterTestCase):
             for e in f.evidence:
                 self.assertIsInstance(e, dict)
                 self.assertIn('file', e)
+
+
+# ---- where one @import points ------------------------------------
+
+class ImportTargetTests(ClaudeCodeAdapterTestCase):
+    """@imports are resolved the way the scanner sees the machine:
+    '@~/' against its own home, and a target outside the audited area
+    is neither dead nor read."""
+
+    put = staticmethod(put)
+
+    def setUp(self):
+        # targets are judged on resolved paths (symlinks included)
+        super().setUp()
+        self.ctx = HarnessContext(root=self.root.resolve(),
+                                  home=self.home.resolve())
+
+    def findings(self, check_id):
+        return self.findings_by_id(check_id)
+
+    def test_home_relative_import_resolves_against_the_scanners_home(self):
+        self.put(self.home, '.claude/CLAUDE.md', '# User\n\n@~/.claude/rules/common.md\n')
+        self.put(self.home, '.claude/rules/common.md', '# Common\n\nBe brief.\n')
+        self.assertEqual(self.findings('CLAUDE_IMPORT_MISSING'), [])
+        self.assertEqual(self.findings('CLAUDE_IMPORT_OUTSIDE'), [])
+        sources = [s.path for s in self.adapter.instruction_sources(self.ctx)]
+        self.assertIn((self.home / '.claude' / 'rules' / 'common.md').resolve(),
+                      [p.resolve() for p in sources])
+
+    def test_home_relative_missing_file_is_a_dead_import(self):
+        self.put(self.home, '.claude/CLAUDE.md', '# User\n\n@~/claude/absent.md\n')
+        hits = self.findings('CLAUDE_IMPORT_MISSING')
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0].evidence[0]['import'], '~/claude/absent.md')
+
+    def test_absolute_import_outside_the_area_is_not_dead_and_not_read(self):
+        with tempfile.TemporaryDirectory() as other:
+            target = self.put(Path(other), 'shared/abs.md', '# Outside\n\nSECRET-RULE\n')
+            self.put(self.root, 'CLAUDE.md', '# Project\n\n@%s\n' % target.as_posix())
+            self.assertEqual(self.findings('CLAUDE_IMPORT_MISSING'), [])
+            hits = self.findings('CLAUDE_IMPORT_OUTSIDE')
+            self.assertEqual(len(hits), 1)
+            self.assertEqual(hits[0].status, 'unknown')
+            # the real path is neither read nor reported
+            self.assertNotIn(str(other), json.dumps(hits[0].to_dict()))
+            texts = [p.read_text(encoding='utf-8')
+                     for p in [s.path for s in
+                               self.adapter.instruction_sources(self.ctx)]
+                     if p.is_file()]
+            self.assertNotIn('SECRET-RULE', ''.join(texts))
+
+    def test_relative_escape_through_parent_is_outside(self):
+        with tempfile.TemporaryDirectory() as other:
+            self.put(Path(other), 'up.md', '# Up\n')
+            # the import is written inside the audited folder and walks
+            # out of it with '..'
+            self.put(self.root, 'CLAUDE.md',
+                     '# Project\n\n@../%s/up.md\n' % Path(other).name)
+            self.assertEqual(self.findings('CLAUDE_IMPORT_MISSING'), [])
+            self.assertEqual(len(self.findings('CLAUDE_IMPORT_OUTSIDE')), 1)
+
+    def test_chain_lists_an_outside_target_as_unloaded(self):
+        with tempfile.TemporaryDirectory() as other:
+            target = self.put(Path(other), 'shared/abs.md', '# Outside\n')
+            self.put(self.root, 'CLAUDE.md', '# Project\n\n@%s\n' % target.as_posix())
+            chain = self.adapter.resolve_chain(self.ctx, self.root)
+            self.assertEqual(len(chain.loaded), 1)
+            self.assertEqual(len(chain.unloaded), 1)
+            source, reason = chain.unloaded[0]
+            self.assertIn('outside the audited area', reason)
+            self.assertNotIn(str(other), str(source.path))
+
+    def test_plain_windows_absolute_path_is_recognised(self):
+        # the drive-letter form must count as absolute on every platform
+        target, state = self.adapter._import_target(
+            self.ctx, self.root / 'CLAUDE.md', 'C:/definitely/missing/file.md')
+        self.assertEqual((target, state), (None, 'missing'))
+
+    def test_depth_finding_ignores_outside_targets(self):
+        with tempfile.TemporaryDirectory() as other:
+            target = self.put(Path(other), 'shared/abs.md', '# Outside\n')
+            self.put(self.root, 'CLAUDE.md', '# Project\n\n@%s\n' % target.as_posix())
+            self.assertEqual(self.findings('CLAUDE_IMPORT_DEPTH'), [])
 
 
 if __name__ == '__main__':

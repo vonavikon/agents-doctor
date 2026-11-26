@@ -121,9 +121,11 @@ class ExplainCommand(CliCase):
         code, out, err = self.run_cli(['explain', str(out_json), fid])
         self.assertEqual(code, 0, err)
         self.assertIn(fid, out)
-        self.assertIn('title:', out)
-        self.assertIn('recommendation:', out)
-        self.assertIn('evidence:', out)
+        # the digest card: what, where, what to do. The raw evidence
+        # list (absolute paths, quoted lines) is not printed.
+        self.assertIn('what:', out)
+        self.assertIn('what to do:', out)
+        self.assertNotIn('evidence:', out)
 
     def test_explain_unknown_fid_exits_2(self):
         out_json, _rep, _ = self.audit()

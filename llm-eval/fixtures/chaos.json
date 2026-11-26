@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "root": "C:\\workspaces\\chaos-demo\\workspace",
   "home": "C:\\workspaces\\chaos-demo\\home",
-  "generated_at": "2026-11-16T16:21:28+03:00",
+  "generated_at": "2026-11-26T14:00:09+03:00",
   "top_level": [
     {
       "name": ".agents",
@@ -41,7 +41,8 @@
         "dirty": [
           "config.py"
         ],
-        "untracked": []
+        "untracked": [],
+        "credentials_in_remote": false
       },
       "size_bytes": 44,
       "extra": {
@@ -69,11 +70,15 @@
             "rule_id": "SEC-005",
             "confidence": 0.7,
             "value": "[REDACTED]",
-            "fingerprint": "sha256:d65e365cdae5b78b"
+            "fingerprint": "hmac256:09302ad18da1ef15b32ec2472d84297e",
+            "in_bundle": false
           }
         ],
         "nested_repos": [
           "vendor\\engine"
+        ],
+        "nested_repos_ignored": [
+          "vendor/engine"
         ]
       }
     },
@@ -84,7 +89,8 @@
         "remote": "https://gitlab.example.com/legacy/crm.git",
         "last_commit": "2026-07-01T10:00:00+03:00",
         "dirty": [],
-        "untracked": []
+        "untracked": [],
+        "credentials_in_remote": false
       },
       "size_bytes": 10,
       "extra": {
@@ -96,7 +102,8 @@
         "hooks": [],
         "sync_commits_last30": 0,
         "tracked_secrets": [],
-        "nested_repos": []
+        "nested_repos": [],
+        "nested_repos_ignored": []
       }
     },
     {
@@ -112,7 +119,8 @@
         "remote": null,
         "last_commit": "2026-08-10T16:00:00+03:00",
         "dirty": [],
-        "untracked": []
+        "untracked": [],
+        "credentials_in_remote": false
       },
       "size_bytes": 390,
       "extra": {
@@ -124,7 +132,8 @@
         "hooks": [],
         "sync_commits_last30": 0,
         "tracked_secrets": [],
-        "nested_repos": []
+        "nested_repos": [],
+        "nested_repos_ignored": []
       }
     },
     {
@@ -149,6 +158,7 @@
   "context_files": [
     {
       "path": "AGENTS.md",
+      "origin": "project",
       "lines": 385,
       "size_bytes": 64853,
       "is_pointer": false,
@@ -165,6 +175,7 @@
     },
     {
       "path": ".zcode\\AGENTS.md",
+      "origin": "home",
       "lines": 2,
       "size_bytes": 34,
       "is_pointer": false,
@@ -175,6 +186,7 @@
     },
     {
       "path": ".claude\\CLAUDE.md",
+      "origin": "home",
       "lines": 2,
       "size_bytes": 46,
       "is_pointer": false,
@@ -185,6 +197,7 @@
     },
     {
       "path": "tools\\AGENTS.md",
+      "origin": "project",
       "lines": 5,
       "size_bytes": 199,
       "is_pointer": false,
@@ -197,6 +210,7 @@
     },
     {
       "path": "tools\\CLAUDE.md",
+      "origin": "project",
       "lines": 5,
       "size_bytes": 179,
       "is_pointer": false,
@@ -345,7 +359,15 @@
     "locations_checked": [
       "user-zcode: C:\\workspaces\\chaos-demo\\home\\.zcode\\skills",
       "project-agents: C:\\workspaces\\chaos-demo\\workspace\\.agents\\skills"
-    ]
+    ],
+    "coverage": {
+      "checked": [
+        "user-zcode",
+        "project-agents"
+      ],
+      "failed": [],
+      "truncated": []
+    }
   },
   "context_budget": [
     {
@@ -442,7 +464,7 @@
       "path": "tools\\CLAUDE.md: maintained for a dead harness, claude inactive for 200 days"
     }
   ],
-  "rules_version": "0.4.0",
+  "rules_version": "3.1.0",
   "junk": {
     "files": [
       {
@@ -499,7 +521,7 @@
       "line": 6,
       "kind": "api-key",
       "mask": "sk-***",
-      "fingerprint": "sha256:424952bbfc6b2068",
+      "fingerprint": "hmac256:9b9ee58fb4dc1ee386958ca877b5bd94",
       "confidence": 0.95
     }
   ],
@@ -517,7 +539,7 @@
         },
         {
           "rule": "nested-repos",
-          "status": "warn"
+          "status": "pass"
         },
         {
           "rule": "harness-env-conflict",
@@ -530,10 +552,10 @@
       "status": "fail",
       "evidence": [
         "drifted config pairs: 1",
-        "nested repositories: 1",
+        "nested repositories: 0",
         "harness dirs present: 1, active among them: 1"
       ],
-      "confidence": 0.85,
+      "confidence": 0.9,
       "recommendation": "Fix the layout: one instruction source per level, no nested repositories, project dirs only for harnesses in use.",
       "doc_ref": "README.md#the-nine-gates"
     },
@@ -580,6 +602,10 @@
           "status": "warn"
         },
         {
+          "rule": "content-quality",
+          "status": "warn"
+        },
+        {
           "rule": "pair-drift",
           "status": "fail"
         },
@@ -596,6 +622,7 @@
         "instruction files checked: 5, dead references: 4",
         "generic markers: 1",
         "instruction files over benchmark: 1",
+        "files analyzed: 3, worst signal ratio: 0.01, generic phrases: 0, contradictions: 0, redundant pairs: 0",
         "drifted pairs: 1",
         "chains over budget: 1"
       ],
@@ -690,6 +717,12 @@
           "status": "fail"
         },
         {
+          "rule": "history-coverage",
+          "status": "unknown",
+          "why": "history_not_scanned",
+          "reason": "Git history was not scanned for keys"
+        },
+        {
           "rule": "secret-prevention",
           "status": "warn"
         }
@@ -700,7 +733,8 @@
       "status": "fail",
       "evidence": [
         "secrets found in workspace files: 1",
-        "secret hits in git (index, remote URLs): 1",
+        "secret hits in git (index, remote URLs, history): 1",
+        "deep scan not requested: history unchecked (not a pass)",
         "secret scan hooks found: 0 (repositories scanned: 3)"
       ],
       "confidence": 0.7,
@@ -771,7 +805,7 @@
       "status": "fail",
       "evidence": [
         "governance notes: 1",
-        "drifted pairs: 1, owned by G1/G3 findings (DIR-001, RUL-007)",
+        "drifted pairs: 1, owned by G1/G3 findings (DIR-001, RUL-009)",
         "MCP configs with duplicate keys: 0"
       ],
       "confidence": 0.85,
@@ -822,11 +856,132 @@
       "doc_ref": "README.md#limits-and-thresholds"
     }
   ],
+  "git_roots": [
+    "legacy-crm",
+    "legacy-crm-hotfix",
+    "legacy-crm\\vendor\\engine",
+    "tools"
+  ],
   "stats": {
+    "profile": {
+      "walk": 0.047,
+      "top_git": 0.437,
+      "context": 0.047,
+      "enrich": 0.109,
+      "gates": 0.0
+    },
     "total_files": 18,
     "total_size_bytes": 8478720,
     "skipped_symlinks_outside": 0,
-    "duration_sec": 0.5
+    "skipped_symlink_names": [],
+    "own_source_skipped": 0,
+    "duration_sec": 0.64
+  },
+  "content_quality": {
+    "AGENTS.md": {
+      "filepath": "AGENTS.md",
+      "size_bytes": 64853,
+      "total_lines": 389,
+      "non_blank_lines": 385,
+      "signal_lines": 2,
+      "noise_lines": 383,
+      "signal_ratio": 0.005,
+      "generic_phrases": [],
+      "generic_count": 0,
+      "unique_rules": 2,
+      "instruction_density": 0.032,
+      "redundant_pairs": [],
+      "redundant_total": 0,
+      "contradictions": [],
+      "specificity": 1.0,
+      "vague_instructions": [],
+      "vague_count": 0,
+      "obsolete_hints": [
+        {
+          "line": 3,
+          "ref": "scripts/deploy.sh",
+          "text": "- Деплой: `scripts/deploy.sh`"
+        },
+        {
+          "line": 4,
+          "ref": "docs/runbook.md",
+          "text": "- Регламент дежурств: `docs/runbook.md`"
+        }
+      ],
+      "obsolete_count": 2,
+      "overlong_lines": [],
+      "overlong_count": 0,
+      "staleness_hint": {
+        "computable": false,
+        "reason": "requires git history"
+      }
+    },
+    "tools\\AGENTS.md": {
+      "filepath": "tools\\AGENTS.md",
+      "size_bytes": 199,
+      "total_lines": 6,
+      "non_blank_lines": 5,
+      "signal_lines": 1,
+      "noise_lines": 4,
+      "signal_ratio": 0.2,
+      "generic_phrases": [],
+      "generic_count": 0,
+      "unique_rules": 1,
+      "instruction_density": 5.146,
+      "redundant_pairs": [],
+      "redundant_total": 0,
+      "contradictions": [],
+      "specificity": 1.0,
+      "vague_instructions": [],
+      "vague_count": 0,
+      "obsolete_hints": [
+        {
+          "line": 4,
+          "ref": "docs/api.md",
+          "text": "- Справочник API: `docs/api.md`"
+        }
+      ],
+      "obsolete_count": 1,
+      "overlong_lines": [],
+      "overlong_count": 0,
+      "staleness_hint": {
+        "computable": false,
+        "reason": "requires git history"
+      }
+    },
+    "tools\\CLAUDE.md": {
+      "filepath": "tools\\CLAUDE.md",
+      "size_bytes": 179,
+      "total_lines": 6,
+      "non_blank_lines": 5,
+      "signal_lines": 2,
+      "noise_lines": 3,
+      "signal_ratio": 0.4,
+      "generic_phrases": [],
+      "generic_count": 0,
+      "unique_rules": 2,
+      "instruction_density": 11.441,
+      "redundant_pairs": [],
+      "redundant_total": 0,
+      "contradictions": [],
+      "specificity": 1.0,
+      "vague_instructions": [],
+      "vague_count": 0,
+      "obsolete_hints": [
+        {
+          "line": 5,
+          "ref": "config/defaults.yaml",
+          "text": "- Дефолты: `config/defaults.yaml`"
+        }
+      ],
+      "obsolete_count": 1,
+      "overlong_lines": [],
+      "overlong_count": 0,
+      "staleness_hint": {
+        "computable": false,
+        "reason": "requires git history"
+      }
+    }
   },
   "config_integrity": [
     {
@@ -925,15 +1080,390 @@
     "x-helper": {
       "frontmatter_ok": true,
       "missing_fields": [],
+      "fields_checked": true,
+      "parse_error": null,
       "dead_refs": [],
-      "parser": "yaml"
+      "parser": "yaml",
+      "path": "C:\\workspaces\\chaos-demo\\workspace\\.agents\\skills\\x-helper\\SKILL.md"
     },
     "doc-helper": {
       "frontmatter_ok": true,
       "missing_fields": [],
+      "fields_checked": true,
+      "parse_error": null,
       "dead_refs": [],
-      "parser": "yaml"
+      "parser": "yaml",
+      "path": "C:\\workspaces\\chaos-demo\\workspace\\.agents\\skills\\doc-helper\\SKILL.md"
     }
+  },
+  "harnesses": [
+    {
+      "harness": "zcode",
+      "status": "detected",
+      "confidence": "high",
+      "activity": "active",
+      "version": null,
+      "markers": [
+        ".agents",
+        "AGENTS.md"
+      ],
+      "evidence": [
+        "project markers: .agents, AGENTS.md; recent activity (<=30d)"
+      ]
+    },
+    {
+      "harness": "claude_code",
+      "status": "detected",
+      "confidence": "medium",
+      "activity": "abandoned",
+      "version": null,
+      "markers": [
+        ".mcp.json"
+      ],
+      "evidence": [
+        "project markers: .mcp.json; activity abandoned"
+      ]
+    },
+    {
+      "harness": "codex",
+      "status": "detected",
+      "confidence": "medium",
+      "activity": "unknown",
+      "version": null,
+      "markers": [
+        "AGENTS.md",
+        ".agents"
+      ],
+      "evidence": [
+        "project markers: AGENTS.md, .agents; activity unknown"
+      ]
+    },
+    {
+      "harness": "cursor",
+      "status": "not_found",
+      "confidence": "low",
+      "activity": "unknown",
+      "version": null,
+      "markers": [],
+      "evidence": [
+        "no markers found"
+      ]
+    },
+    {
+      "harness": "gemini_cli",
+      "status": "not_found",
+      "confidence": "low",
+      "activity": "unknown",
+      "version": null,
+      "markers": [],
+      "evidence": [
+        "no markers found"
+      ]
+    },
+    {
+      "harness": "opencode",
+      "status": "detected",
+      "confidence": "medium",
+      "activity": "unknown",
+      "version": null,
+      "markers": [
+        "AGENTS.md"
+      ],
+      "evidence": [
+        "project markers: AGENTS.md; activity unknown"
+      ]
+    },
+    {
+      "harness": "github_copilot",
+      "status": "not_found",
+      "confidence": "low",
+      "activity": "unknown",
+      "version": null,
+      "markers": [],
+      "evidence": [
+        "no markers found"
+      ]
+    },
+    {
+      "harness": "windsurf",
+      "status": "not_found",
+      "confidence": "low",
+      "activity": "unknown",
+      "version": null,
+      "markers": [],
+      "evidence": [
+        "no markers found"
+      ]
+    }
+  ],
+  "harness_spec_matrix": [
+    {
+      "harness_id": "zcode",
+      "display_name": "Z Code",
+      "adapter_version": "1.0.0",
+      "spec_source": "",
+      "spec_verified": "2026-11-17",
+      "supported_versions": "current CLI (version not detectable offline)",
+      "known_limitations": [
+        "nested AGENTS.md merging not modelled; only user + project root"
+      ],
+      "capability_status": {
+        "detection": "documented",
+        "user_settings": "documented",
+        "instruction_hierarchy": "approximated",
+        "loading_order": "approximated",
+        "imports": "unsupported",
+        "glob_matching": "unsupported",
+        "nested_instructions": "unsupported",
+        "skills": "documented",
+        "mcp": "documented",
+        "permissions": "unknown",
+        "context_budget": "documented",
+        "version_detect": "unknown",
+        "spec_freshness": "documented"
+      }
+    },
+    {
+      "harness_id": "claude_code",
+      "display_name": "Claude Code",
+      "adapter_version": "1.0.0",
+      "spec_source": "https://docs.anthropic.com/en/docs/claude-code",
+      "spec_verified": "2026-11-17",
+      "supported_versions": "2.x (loading model, unverified against runtime)",
+      "known_limitations": [
+        "subdirectory CLAUDE.md lazy loading modelled as path-based inclusion: a nested file is active only when the target directory lies inside its subtree",
+        "enterprise managed policies not modelled (no offline source)",
+        "AGENTS.md support depends on version >= 2.1.296; when both CLAUDE.md and AGENTS.md exist, both are reported as project sources",
+        "no documented instruction context budget"
+      ],
+      "capability_status": {
+        "detection": "documented",
+        "user_settings": "documented",
+        "instruction_hierarchy": "approximated",
+        "loading_order": "approximated",
+        "imports": "approximated",
+        "glob_matching": "approximated",
+        "nested_instructions": "approximated",
+        "skills": "documented",
+        "mcp": "documented",
+        "permissions": "documented",
+        "context_budget": "unsupported",
+        "version_detect": "unsupported",
+        "spec_freshness": "documented"
+      }
+    },
+    {
+      "harness_id": "codex",
+      "display_name": "OpenAI Codex",
+      "adapter_version": "1.0.0",
+      "spec_source": "https://developers.openai.com/codex",
+      "spec_verified": "2026-11-17",
+      "supported_versions": "current CLI (unverified)",
+      "known_limitations": [
+        "AGENTS.md merge order modelled as documented, not runtime-verified",
+        "project .codex/config.toml support varies by version"
+      ],
+      "capability_status": {
+        "detection": "documented",
+        "user_settings": "documented",
+        "instruction_hierarchy": "documented",
+        "loading_order": "documented",
+        "imports": "unsupported",
+        "glob_matching": "unsupported",
+        "nested_instructions": "approximated",
+        "skills": "unknown",
+        "mcp": "documented",
+        "permissions": "documented",
+        "context_budget": "approximated",
+        "version_detect": "approximated",
+        "spec_freshness": "documented"
+      }
+    },
+    {
+      "harness_id": "cursor",
+      "display_name": "Cursor",
+      "adapter_version": "1.0.0",
+      "spec_source": "https://docs.cursor.com/context/rules",
+      "spec_verified": "2026-11-17",
+      "supported_versions": "current (unverified)",
+      "known_limitations": [
+        "glob semantics approximated with fnmatch + dir-prefix; nested .mdc referencing not modelled"
+      ],
+      "capability_status": {
+        "detection": "documented",
+        "user_settings": "unsupported",
+        "instruction_hierarchy": "documented",
+        "loading_order": "approximated",
+        "imports": "unsupported",
+        "glob_matching": "approximated",
+        "nested_instructions": "unsupported",
+        "skills": "unsupported",
+        "mcp": "documented",
+        "permissions": "unknown",
+        "context_budget": "unknown",
+        "version_detect": "unsupported",
+        "spec_freshness": "documented"
+      }
+    },
+    {
+      "harness_id": "gemini_cli",
+      "display_name": "Gemini CLI",
+      "adapter_version": "1.0.0",
+      "spec_source": "https://docs.gemini-cli / https://github.com/google-gemini/gemini-cli",
+      "spec_verified": "2026-11-17",
+      "supported_versions": "current (unverified)",
+      "known_limitations": [
+        "hierarchical GEMINI.md loading modelled as documented, not runtime-verified",
+        "AI memories under ~/.gemini/tmp/<hash>/memories/ are not modelled",
+        "import depth limit of 5 hops taken from documentation",
+        "@import token extraction approximated with a regex; fenced code blocks are not excluded"
+      ],
+      "capability_status": {
+        "detection": "documented",
+        "user_settings": "documented",
+        "instruction_hierarchy": "approximated",
+        "loading_order": "documented",
+        "imports": "approximated",
+        "glob_matching": "unsupported",
+        "nested_instructions": "documented",
+        "skills": "documented",
+        "mcp": "documented",
+        "permissions": "unknown",
+        "context_budget": "unknown",
+        "version_detect": "unsupported",
+        "spec_freshness": "documented"
+      }
+    },
+    {
+      "harness_id": "opencode",
+      "display_name": "OpenCode",
+      "adapter_version": "1.0.0",
+      "spec_source": "https://opencode.ai/docs/config/",
+      "spec_verified": "2026-11-17",
+      "supported_versions": "current (unverified)",
+      "known_limitations": [
+        "jsonc comment stripping is heuristic (string-aware // line comments only; /* */ block comments are not handled)",
+        "AGENTS.md merge order and the `instruction` file precedence are modelled from the docs, not runtime-verified"
+      ],
+      "capability_status": {
+        "detection": "documented",
+        "user_settings": "documented",
+        "instruction_hierarchy": "documented",
+        "loading_order": "approximated",
+        "imports": "unsupported",
+        "glob_matching": "unsupported",
+        "nested_instructions": "documented",
+        "skills": "documented",
+        "mcp": "approximated",
+        "permissions": "documented",
+        "context_budget": "unknown",
+        "version_detect": "unsupported",
+        "spec_freshness": "documented"
+      }
+    },
+    {
+      "harness_id": "github_copilot",
+      "display_name": "GitHub Copilot",
+      "adapter_version": "1.0.0",
+      "spec_source": "https://docs.github.com/en/copilot",
+      "spec_verified": "2026-11-17",
+      "supported_versions": "current (unverified)",
+      "known_limitations": [
+        "global instructions live in editor settings, not the repo; they cannot be detected or validated offline",
+        "YAML mcp config validated heuristically (no top-level key check only, no full YAML parse)"
+      ],
+      "capability_status": {
+        "detection": "documented",
+        "user_settings": "unknown",
+        "instruction_hierarchy": "documented",
+        "loading_order": "approximated",
+        "imports": "unsupported",
+        "glob_matching": "approximated",
+        "nested_instructions": "unsupported",
+        "skills": "documented",
+        "mcp": "approximated",
+        "permissions": "unsupported",
+        "context_budget": "approximated",
+        "version_detect": "unsupported",
+        "spec_freshness": "documented"
+      }
+    },
+    {
+      "harness_id": "windsurf",
+      "display_name": "Windsurf",
+      "adapter_version": "1.0.0",
+      "spec_source": "https://docs.windsurf.com/windsurf/cascade/rules",
+      "spec_verified": "2026-11-17",
+      "supported_versions": "current (unverified)",
+      "known_limitations": [
+        "memories and workflows internals not modelled",
+        "glob semantics approximated with fnmatch + dir-prefix"
+      ],
+      "capability_status": {
+        "detection": "documented",
+        "user_settings": "unsupported",
+        "instruction_hierarchy": "documented",
+        "loading_order": "approximated",
+        "imports": "unsupported",
+        "glob_matching": "approximated",
+        "nested_instructions": "unsupported",
+        "skills": "unsupported",
+        "mcp": "documented",
+        "permissions": "unsupported",
+        "context_budget": "unknown",
+        "version_detect": "unsupported",
+        "spec_freshness": "documented"
+      }
+    }
+  ],
+  "instruction_conflict_summary": {
+    "contradiction": 0,
+    "duplication": 0,
+    "divergence": 0
+  },
+  "harness_findings_raw": [
+    {
+      "gate": "G3",
+      "prefix": "RUL",
+      "category": "instructions",
+      "severity": "medium",
+      "status": "warn",
+      "title": "AGENTS.md chain over the Codex context budget",
+      "description": "global + project + nested AGENTS.md total 65447 bytes, over the 32768-byte budget. Codex loads the whole chain into context, so the bloat displaces working context.",
+      "evidence": [
+        {
+          "file": "C:\\workspaces\\chaos-demo\\workspace\\AGENTS.md",
+          "detail": "65242 bytes"
+        },
+        {
+          "file": "C:\\workspaces\\chaos-demo\\workspace\\tools\\AGENTS.md",
+          "detail": "205 bytes"
+        }
+      ],
+      "confidence": 0.85,
+      "recommendation": "shorten the files or move subtree-specific rules into nested AGENTS.md so only the active subtree pays for them.",
+      "harness": "codex",
+      "check_id": "CODEX_CHAIN_BUDGET"
+    }
+  ],
+  "mcp_inventory": {
+    "servers": [
+      {
+        "harness": "claude_code",
+        "config_file": "C:\\workspaces\\chaos-demo\\workspace\\.mcp.json",
+        "name": "tasks",
+        "transport": "http",
+        "command_head": [],
+        "url_host": "mcp.example.com",
+        "has_env_keys": false,
+        "env_key_names": [],
+        "suspicious_command": false
+      }
+    ],
+    "files_scanned": [
+      "C:\\workspaces\\chaos-demo\\workspace\\.mcp.json"
+    ],
+    "parse_errors": []
   },
   "findings_detailed": [
     {
@@ -953,26 +1483,8 @@
       ],
       "confidence": 0.9,
       "recommendation": "Keep one file as the source and turn the other into a pointer to it.",
-      "autofix_available": false
-    },
-    {
-      "schema_version": "1.0",
-      "fid": "DIR-002",
-      "gate": "G1",
-      "category": "dirs",
-      "severity": "medium",
-      "status": "warn",
-      "title": "Nested repository in legacy-crm: vendor\\engine",
-      "description": "A git repository lives inside another repository; the outer one sees it as embedded untracked content and sync tools mis-handle it.",
-      "evidence": [
-        {
-          "repo": "legacy-crm",
-          "nested": "vendor\\engine"
-        }
-      ],
-      "confidence": 0.85,
-      "recommendation": "Register it as a submodule or move it out to the workspace top level.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "DIR_INSTRUCTION_PAIR_DRIFT"
     },
     {
       "schema_version": "1.0",
@@ -992,7 +1504,8 @@
       ],
       "confidence": 0.9,
       "recommendation": "Fix or remove the reference.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "RUL_DEAD_REFERENCE"
     },
     {
       "schema_version": "1.0",
@@ -1012,7 +1525,8 @@
       ],
       "confidence": 0.9,
       "recommendation": "Fix or remove the reference.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "RUL_DEAD_REFERENCE"
     },
     {
       "schema_version": "1.0",
@@ -1032,7 +1546,8 @@
       ],
       "confidence": 0.9,
       "recommendation": "Fix or remove the reference.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "RUL_DEAD_REFERENCE"
     },
     {
       "schema_version": "1.0",
@@ -1052,7 +1567,8 @@
       ],
       "confidence": 0.9,
       "recommendation": "Fix or remove the reference.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "RUL_DEAD_REFERENCE"
     },
     {
       "schema_version": "1.0",
@@ -1071,7 +1587,8 @@
       ],
       "confidence": 0.7,
       "recommendation": "Replace the boilerplate with project-specific rules or drop it.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "RUL_GENERIC_BOILERPLATE"
     },
     {
       "schema_version": "1.0",
@@ -1090,11 +1607,54 @@
       ],
       "confidence": 0.85,
       "recommendation": "Split the file: keep rules auto-loaded, move the rest to linked docs.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "RUL_FILE_TOO_BIG"
     },
     {
       "schema_version": "1.0",
       "fid": "RUL-007",
+      "gate": "G3",
+      "category": "rules",
+      "severity": "medium",
+      "status": "warn",
+      "title": "Instruction file is mostly noise (signal ratio 0%)",
+      "description": "Less than 30% of the non-blank lines are actionable instructions. The rest is narrative, descriptions, or filler.",
+      "evidence": [
+        {
+          "file": "AGENTS.md",
+          "ratio": 0.01,
+          "bytes": 64853
+        }
+      ],
+      "confidence": 0.85,
+      "recommendation": "Trim to actionable rules: what to run, what to avoid, where files are.",
+      "autofix_available": false,
+      "check_id": "RUL_MOSTLY_NOISE"
+    },
+    {
+      "schema_version": "1.0",
+      "fid": "RUL-008",
+      "gate": "G3",
+      "category": "rules",
+      "severity": "info",
+      "status": "pass",
+      "title": "Short instruction file, few concrete rules (signal ratio 20%)",
+      "description": "Less than 30% of the non-blank lines are actionable instructions. The rest is narrative, descriptions, or filler.",
+      "evidence": [
+        {
+          "file": "tools\\AGENTS.md",
+          "ratio": 0.2,
+          "bytes": 199
+        }
+      ],
+      "confidence": 0.85,
+      "recommendation": "A short pointer file is fine as it is; check it only if it was meant to hold rules.",
+      "autofix_available": false,
+      "check_id": "RUL_SHORT_FILE_HINT"
+    },
+    {
+      "schema_version": "1.0",
+      "fid": "RUL-009",
       "gate": "G3",
       "category": "rules",
       "severity": "high",
@@ -1109,11 +1669,12 @@
       ],
       "confidence": 0.9,
       "recommendation": "Keep one file as the source and make the other a pointer (structure view: G1).",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "RUL_TWO_RULE_SOURCES"
     },
     {
       "schema_version": "1.0",
-      "fid": "RUL-008",
+      "fid": "RUL-010",
       "gate": "G3",
       "category": "rules",
       "severity": "medium",
@@ -1128,11 +1689,37 @@
       ],
       "confidence": 0.9,
       "recommendation": "Trim the chain or split nested instructions into linked files.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "RUL_CHAIN_OVER_BUDGET"
     },
     {
       "schema_version": "1.0",
-      "fid": "DIR-003",
+      "fid": "RUL-011",
+      "gate": "G3",
+      "category": "instructions",
+      "severity": "medium",
+      "status": "warn",
+      "title": "AGENTS.md chain over the Codex context budget",
+      "description": "global + project + nested AGENTS.md total 65447 bytes, over the 32768-byte budget. Codex loads the whole chain into context, so the bloat displaces working context.",
+      "evidence": [
+        {
+          "file": "C:\\workspaces\\chaos-demo\\workspace\\AGENTS.md",
+          "detail": "65242 bytes"
+        },
+        {
+          "file": "C:\\workspaces\\chaos-demo\\workspace\\tools\\AGENTS.md",
+          "detail": "205 bytes"
+        }
+      ],
+      "confidence": 0.85,
+      "recommendation": "shorten the files or move subtree-specific rules into nested AGENTS.md so only the active subtree pays for them.",
+      "autofix_available": false,
+      "harness": "codex",
+      "check_id": "CODEX_CHAIN_BUDGET"
+    },
+    {
+      "schema_version": "1.0",
+      "fid": "DIR-002",
       "gate": "G4",
       "category": "dirs",
       "severity": "medium",
@@ -1148,11 +1735,12 @@
       ],
       "confidence": 0.9,
       "recommendation": "Move it under version control, archive it, or delete it.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "DIR_HEAVY_OUTSIDE_GIT"
     },
     {
       "schema_version": "1.0",
-      "fid": "DIR-004",
+      "fid": "DIR-003",
       "gate": "G4",
       "category": "dirs",
       "severity": "low",
@@ -1183,7 +1771,8 @@
       ],
       "confidence": 0.9,
       "recommendation": "Decide for each folder: make it a repo, move it into one, or remove it.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "DIR_LOOSE_TOP_FOLDERS"
     },
     {
       "schema_version": "1.0",
@@ -1201,7 +1790,8 @@
       ],
       "confidence": 0.8,
       "recommendation": "Add a trigger phrase (\"use when ...\") to the description.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "SKL_NO_TRIGGERS"
     },
     {
       "schema_version": "1.0",
@@ -1219,7 +1809,8 @@
       ],
       "confidence": 0.8,
       "recommendation": "Add a trigger phrase (\"use when ...\") to the description.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "SKL_NO_TRIGGERS"
     },
     {
       "schema_version": "1.0",
@@ -1238,7 +1829,8 @@
       ],
       "confidence": 0.95,
       "recommendation": "Shorten the description; move details into the skill body.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "SKL_DESCRIPTION_TOO_LONG"
     },
     {
       "schema_version": "1.0",
@@ -1256,7 +1848,8 @@
       ],
       "confidence": 0.8,
       "recommendation": "Add a trigger phrase (\"use when ...\") to the description.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "SKL_NO_TRIGGERS"
     },
     {
       "schema_version": "1.0",
@@ -1279,7 +1872,8 @@
       ],
       "confidence": 0.95,
       "recommendation": "Pick one canonical location and delete or sync the rest.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "SKL_COPIES_DIVERGED"
     },
     {
       "schema_version": "1.0",
@@ -1296,12 +1890,14 @@
           "line": 6,
           "kind": "api-key",
           "mask": "sk-***",
-          "fingerprint": "sha256:424952bbfc6b2068"
+          "fingerprint": "hmac256:9b9ee58fb4dc1ee386958ca877b5bd94",
+          "git": null
         }
       ],
       "confidence": 0.95,
       "recommendation": "Rotate the secret at its provider, remove it from the file and purge it from history.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "SEC_EXPOSED_SECRET"
     },
     {
       "schema_version": "1.0",
@@ -1318,12 +1914,13 @@
           "file": "config.py",
           "line": 1,
           "kind": "secret literal",
-          "fingerprint": "sha256:d65e365cdae5b78b"
+          "fingerprint": "hmac256:09302ad18da1ef15b32ec2472d84297e"
         }
       ],
       "confidence": 0.7,
       "recommendation": "Rotate the secret, `git rm --cached` the file and purge the history.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "SEC_TRACKED_SECRET"
     },
     {
       "schema_version": "1.0",
@@ -1342,7 +1939,8 @@
       ],
       "confidence": 0.85,
       "recommendation": "Install a pre-commit secret scan (gitleaks or equivalent) in every active repository.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "SEC_PREVENTION_ABSENT"
     },
     {
       "schema_version": "1.0",
@@ -1362,7 +1960,8 @@
       ],
       "confidence": 0.9,
       "recommendation": "Commit or stash the changes; push if the repo has a remote.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "GIT_UNCOMMITTED_WORK"
     },
     {
       "schema_version": "1.0",
@@ -1380,7 +1979,8 @@
       ],
       "confidence": 0.9,
       "recommendation": "Add a .gitignore covering build dirs and local config files.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "GIT_NO_GITIGNORE"
     },
     {
       "schema_version": "1.0",
@@ -1398,7 +1998,8 @@
       ],
       "confidence": 0.9,
       "recommendation": "Add a .gitignore covering build dirs and local config files.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "GIT_NO_GITIGNORE"
     },
     {
       "schema_version": "1.0",
@@ -1420,7 +2021,8 @@
       ],
       "confidence": 0.9,
       "recommendation": "Keep one checkout or make the others deliberate worktrees.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "GIT_MULTIPLE_CHECKOUTS"
     },
     {
       "schema_version": "1.0",
@@ -1438,7 +2040,8 @@
       ],
       "confidence": 0.85,
       "recommendation": "Remove the file or convert it to a pointer under the harness actually in use.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "GOV_DEAD_HARNESS_INSTRUCTIONS"
     },
     {
       "schema_version": "1.0",
@@ -1459,7 +2062,8 @@
       ],
       "confidence": 0.5,
       "recommendation": "Review, then archive or delete.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "HLTH_UNUSED_DATA"
     },
     {
       "schema_version": "1.0",
@@ -1480,7 +2084,8 @@
       ],
       "confidence": 0.5,
       "recommendation": "Review, then archive or delete.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "HLTH_UNUSED_DATA"
     },
     {
       "schema_version": "1.0",
@@ -1501,7 +2106,8 @@
       ],
       "confidence": 0.5,
       "recommendation": "Review, then archive or delete.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "HLTH_UNUSED_DATA"
     },
     {
       "schema_version": "1.0",
@@ -1522,7 +2128,8 @@
       ],
       "confidence": 0.5,
       "recommendation": "Review, then archive or delete.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "HLTH_UNUSED_DATA"
     },
     {
       "schema_version": "1.0",
@@ -1543,7 +2150,8 @@
       ],
       "confidence": 0.5,
       "recommendation": "Review, then archive or delete.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "HLTH_UNUSED_DATA"
     },
     {
       "schema_version": "1.0",
@@ -1561,7 +2169,8 @@
       ],
       "confidence": 0.9,
       "recommendation": "Optional: remove the empty directories.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "HLTH_EMPTY_DIRS"
     },
     {
       "schema_version": "1.0",
@@ -1580,7 +2189,8 @@
       ],
       "confidence": 0.9,
       "recommendation": "Move under version control (git-lfs if needed) or delete.",
-      "autofix_available": false
+      "autofix_available": false,
+      "check_id": "HLTH_LARGE_FILE_OUTSIDE_GIT"
     }
   ]
 }

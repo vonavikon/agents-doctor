@@ -34,16 +34,28 @@ One command over the scanner and all modules.
 python skills/agents-doctor/scripts/agents_doctor.py audit <path>
     [--focus security|structure|agents]
     [--deep] [--home <dir>] [--baseline <prev.json>]
-    [--out scan.json] [--report AUDIT.md] [--runtime]
+    [--out scan.json] [--report AUDIT.md] [--human REPORT.md]
+    [--lang ru|en] [--sessions N] [--summary] [--runtime]
     [--fail-on critical|high|medium|low|info] [--policy FILE.yml]
 ```
 
-Runs the scan in-process, writes scan.json, optionally writes a markdown
-report (`--report`). `--focus` narrows gates and findings to one group:
+Runs the scan in-process, writes scan.json, optionally writes a
+technical report (`--report`) and the plain-language report for people
+who do not work with code (`--human`, in the language of `--lang`,
+default English; `--sessions` feeds its monthly token estimate). A
+missing output folder is created. `--summary` prints the digest of the
+scan: gate statuses with the reason wherever a check did not run, the
+findings that matter with their place and what to do, improvement
+suggestions, where to start, and the files written. The digest is what
+the skill's agent reads; it carries no absolute path and no quoted file
+line. `--focus` narrows gates and findings to one group:
 security=G6,G7; structure=G1,G4,G9; agents=G2,G3,G5,G8. `--baseline`
 adds a diff section (new and resolved findings) by comparing fingerprints
-with a previous scan. `--deep` also scans git history for secrets.
-`--runtime` (opt-in) adds runtime checks after the scan: python/git
+with a previous scan. `--deep` also scans git history for secrets. The
+audited folder itself, when it is a git repository, is checked like the
+repositories inside it (status, remote, hooks, index, history with
+`--deep`); the digest then says so, and suggests keeping `.agents-doctor/`
+out of git when it is not. `--runtime` (opt-in) adds runtime checks after the scan: python/git
 presence, CLI binaries of detected harnesses (`--version`,
 timeout-bounded), static MCP config validation; zero network requests;
 the result lands in the `runtime` section of the report.
@@ -53,6 +65,15 @@ severity have status fail. `--policy f.yml` evaluates policy files and
 embeds the compliance report into the scan JSON (`policy_report`). CI
 recipes: [ci-integration.md](ci-integration.md).
 
+The one command the skill runs:
+
+```
+python skills/agents-doctor/scripts/agents_doctor.py audit <root> \
+    --out <root>/.agents-doctor/scan.json \
+    --report <root>/.agents-doctor/AUDIT.md \
+    --human <root>/.agents-doctor/REPORT.md --lang ru --summary
+```
+
 The audit includes the harness registry stage: detection of every
 registered environment (Z Code, Claude Code, Codex, Cursor, Gemini CLI,
 OpenCode, GitHub Copilot, Windsurf), adapter-specific validation
@@ -60,6 +81,25 @@ OpenCode, GitHub Copilot, Windsurf), adapter-specific validation
 instruction conflicts at the workspace root. External adapters are
 loaded only from paths listed in `.agents-doctor.toml`
 (`[plugins] adapters = [...]`).
+
+```
+python skills/agents-doctor/scripts/agents_doctor.py summary <scan.json>
+    [--lang ru|en] [--human REPORT.md] [--report AUDIT.md]
+```
+
+The digest of a finished scan, the same text `audit --summary` prints.
+`--human` and `--report` name the report files written next to the scan
+so the digest can point at them.
+
+```
+python skills/agents-doctor/scripts/agents_doctor.py explain <scan.json> <fid>
+    [--lang ru|en] [--raw]
+```
+
+One finding as a short card: what it is, where it sits (relative to the
+audited folder), what to do, whether a planned fix exists. `--raw`
+prints the full record with its evidence list, as before; the evidence
+holds absolute paths and is meant for debugging, not for the user.
 
 ```
 python skills/agents-doctor/scripts/agents_doctor.py simulate <root>
@@ -137,8 +177,8 @@ Prints the fingerprint diff: NEW, RESOLVED, PERSISTING, CHANGED.
 python skills/agents-doctor/scripts/agents_doctor.py explain <scan.json> <fid>
 ```
 
-Prints one typed finding: title, description, evidence, severity, status,
-confidence, recommendation.
+Prints one finding as a short card (what, where, what to do, whether a
+planned fix exists); `--raw` prints the full record with its evidence.
 
 ```
 python skills/agents-doctor/scripts/agents_doctor.py fix <scan.json> <fid> [--apply]
@@ -154,12 +194,30 @@ Exit codes: 0 success, 1 error, 2 not found or bad usage.
 
 ```
 python skills/agents-doctor/scripts/report_generator.py <scan.json>
-    [--out AUDIT-<date>.md]
+    [--out AUDIT.md]
 ```
 
-Turns a scan JSON into the markdown report: gates table first, then
-findings grouped by block, commands for the user at the end. Exit 0
-written, 1 bad input.
+Turns a scan JSON into the technical markdown report: gate results with
+the reason wherever a check did not run, critical findings, all
+findings with their location and what to do, recommended actions. Exit
+0 written, 1 bad input.
+
+## Plain-language report: report_human.py
+
+```
+python skills/agents-doctor/scripts/report_human.py <scan.json>
+    [--lang en|ru] [--sessions 10] [--after <scan2.json>]
+    [--out REPORT.md]
+```
+
+The report for people who do not work with code. The main problem comes
+first with its file and line, then every finding with its place and
+what to do, what can be made better (extra tokens at every start,
+memory the agent cannot see, junk), and where to start. When a check
+could not run, the short version names it in one sentence and a section
+of its own gives the reason for each; checks that do not apply stay
+out. `--after` adds the before/after section for a scan made after a
+cleanup.
 
 ## SARIF export: sarif.py (stage 4)
 

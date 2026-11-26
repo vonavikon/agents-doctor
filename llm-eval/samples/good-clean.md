@@ -1,14 +1,23 @@
-# Agents doctor - AUDIT-2026-11-16
+Проверила вашу рабочую папку: красных проверок нет, жёлтых три, остальные зелёные. Серьёзного ничего нет, кое-что стоит привести в порядок.
 
-Everything is quiet: 4 findings, none critical. Four gates sit at warn - G2
-(no configuration files found at all), G4 (four top-level folders outside
-version control), G6 (no secret-scan hook in the one repository), G9 (one
-temp file classified as junk) - and the remaining five gates pass.
+## С чего начать
 
-Recommended next step: decide the fate of the four folders and of HLTH-001
-(incoming\temp-notes.md); nothing here is urgent and nothing was changed by
-this audit.
+1. В проекте `docs-vault` нет автоматической проверки ключей перед сохранением. Поставьте её, чтобы ключ не попал в историю.
+2. Папки `.agents`, `docs` и `incoming` лежат вне истории изменений. Решите для каждой: держать в Git, заархивировать или удалить.
+3. Файл `incoming/temp-notes.md` похож на неиспользуемый. Посмотрите его и удалите либо уберите в архив.
 
-Re-run the scan yourself once you have tidied up:
+## Что ещё найдено
 
-    python skills/agents-doctor/scripts/audit_scan.py . --out re-scan.json
+Стоит посмотреть:
+
+- Файлы настроек не нашлись. Если вы работаете с агентом в этой папке, проверьте, где лежат его настройки.
+
+## Не проверено
+
+Историю Git на ключи я не проверяла: для этого нужен отдельный запуск с глубокой проверкой.
+
+## Что можно улучшить
+
+Файл инструкций `AGENTS.md` короткий. Если это ссылка на другой файл с правилами, всё в порядке.
+
+Полный простой отчёт лежит в файле `.agents-doctor/REPORT.md`. Могу показать план исправления для любой из находок: назовите её.

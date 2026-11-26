@@ -488,6 +488,50 @@ def _fallback_frontmatter(fm_text):
     return ok, pairs
 
 
+def _fallback_syntax_error(fm_text, line_offset=0):
+    """Flat-pair lines the fallback parser can prove invalid YAML.
+
+    A plain (unquoted) scalar may not hold ': ' -- YAML reads it as a
+    second mapping and rejects the document ('description: When asked:
+    prepare a report'). Returns {'line', 'column', 'problem'} for the
+    first such line (1-based in the source file: line_offset is the
+    number of file lines before the block, the opening fence), else
+    None. Nothing else is proven: other malformed blocks stay 'unknown'
+    under the fallback.
+    """
+    for i, line in enumerate(fm_text.splitlines(), 1):
+        m = re.match(r'^([A-Za-z0-9_-]+):\s*(.*)$', line)
+        if not m:
+            continue
+        val = m.group(2)
+        if not val or val[0] in '"\'':
+            continue   # quoted or empty: nothing to prove here
+        bad = val.find(': ')
+        if bad == -1 and val.endswith(':'):
+            bad = len(val) - 1
+        if bad == -1:
+            continue
+        return {'line': i + line_offset, 'column': m.start(2) + bad + 1,
+                'problem': 'unquoted value contains ": " (quote the value)'}
+    return None
+
+
+def _yaml_error_position(exc, line_offset=0):
+    """Where a YAML error sits in the source file: {'line', 'column',
+    'problem'} 1-based, or None when the parser gives no mark.
+
+    Only the position and the library's own problem text are kept. The
+    exception message also quotes the offending source line, and that is
+    user content: it must not travel into reports or model context.
+    """
+    mark = getattr(exc, 'problem_mark', None) or getattr(exc, 'context_mark', None)
+    if mark is None or mark.line is None:
+        return None
+    problem = getattr(exc, 'problem', None) or 'invalid YAML'
+    return {'line': mark.line + 1 + line_offset, 'column': mark.column + 1,
+            'problem': str(problem)[:120]}
+
+
 def _missing_fields(fields):
     missing = []
     for name in REQUIRED_FRONTMATTER_FIELDS:
@@ -519,10 +563,19 @@ def skills_frontmatter(entries):
     """Frontmatter health for scanner skill entries (each has 'path').
 
     Returns {skill_name_or_path: {frontmatter_ok, missing_fields,
-    dead_refs, parser}}. frontmatter_ok is parse-level: True (parsed),
-    False (structurally absent or yaml rejected the block), None
-    (fallback parser cannot handle the structure — unknown, never
-    silently ok). dead_refs lists up to 5 referenced relative files
+    fields_checked, parse_error, dead_refs, parser, path}}.
+    frontmatter_ok is parse-level: True (parsed), False (structurally
+    absent, or rejected as invalid YAML), None (fallback parser cannot
+    judge the structure -- unknown, never silently ok).
+
+    missing_fields lists the required fields that are absent. It is
+    filled only after a successful parse (fields_checked is True): when
+    the block does not parse the fields were never evaluated, so the
+    record carries parse_error = {'line', 'column', 'problem'} in
+    SKILL.md instead of a list of "missing" fields that are in fact
+    present.
+
+    dead_refs lists up to 5 referenced relative files
     (scripts/..., assets/..., references/..., knowledge/...) missing
     under the skill dir. yaml.safe_load is the only parser ever run on
     the raw text; nothing is evaluated.
@@ -532,7 +585,9 @@ def skills_frontmatter(entries):
         path = Path(str(ent.get('path', '')))
         skill_dir = path.parent
         rec = {'frontmatter_ok': None,
-               'missing_fields': list(REQUIRED_FRONTMATTER_FIELDS),
+               'missing_fields': [],
+               'fields_checked': False,
+               'parse_error': None,
                'dead_refs': [], 'parser': 'fallback',
                'path': str(path)}
         try:
@@ -547,14 +602,19 @@ def skills_frontmatter(entries):
 
         if not has_fm:
             rec['frontmatter_ok'] = False  # definitely no frontmatter block
+            # and so the required fields are factually absent
+            rec['fields_checked'] = True
+            rec['missing_fields'] = list(REQUIRED_FRONTMATTER_FIELDS)
         elif yaml is not None:
             rec['parser'] = 'yaml'
             try:
                 data = yaml.safe_load(fm_text)
-            except yaml.YAMLError:
+            except yaml.YAMLError as exc:
+                # line_offset 1 = the opening '---' fence before the block
                 rec['frontmatter_ok'] = False
-                rec['missing_fields'] = list(REQUIRED_FRONTMATTER_FIELDS)
+                rec['parse_error'] = _yaml_error_position(exc, line_offset=1)
             else:
+                rec['fields_checked'] = True
                 if isinstance(data, dict):
                     rec['frontmatter_ok'] = True
                     rec['missing_fields'] = _missing_fields(data)
@@ -567,11 +627,20 @@ def skills_frontmatter(entries):
         else:
             ok, pairs = _fallback_frontmatter(fm_text)
             rec['parser'] = 'fallback'
-            rec['frontmatter_ok'] = ok
-            rec['missing_fields'] = _missing_fields(pairs)
-            candidate = str(pairs.get('name') or '').strip()
-            if ok and candidate:
-                name = candidate
+            err = _fallback_syntax_error(fm_text, line_offset=1)
+            if err is not None:
+                # proven invalid even without a real YAML parser
+                rec['frontmatter_ok'] = False
+                rec['parse_error'] = err
+            elif ok:
+                rec['frontmatter_ok'] = True
+                rec['fields_checked'] = True
+                rec['missing_fields'] = _missing_fields(pairs)
+                candidate = str(pairs.get('name') or '').strip()
+                if candidate:
+                    name = candidate
+            else:
+                rec['frontmatter_ok'] = ok  # None: unknown, not ok
 
         rec['dead_refs'] = _dead_refs(text, skill_dir)
         out[name or key] = rec

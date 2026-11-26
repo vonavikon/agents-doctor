@@ -13,10 +13,17 @@ import json
 import sys
 from pathlib import Path
 
+try:
+    import summary
+except ImportError:  # direct script use from another folder
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import summary
+
 SEVERITY_RANK = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3, 'info': 4}
 OPEN_STATUSES = ('fail', 'warn', 'unknown')
 
 EVIDENCE_TRUNC = 100
+ACTION_TRUNC = 220
 MAX_ACTIONS = 8
 MAX_BASELINE_PATHS = 10
 FOOTER = ('Read-only audit: nothing was modified. '
@@ -77,21 +84,40 @@ def _evidence_line(gate):
     return _first_string(ev[0]) if ev else ''
 
 
-def _finding_location(finding):
+def _finding_location(finding, rep=None):
     """file:line, else path, else the first string field of the first
-    evidence entry; empty when there is no evidence."""
+    evidence entry; empty when there is no evidence. Absolute paths are
+    shortened to what a person sees from the audited folder."""
     ev = finding.get('evidence') or []
     if not ev:
         return ''
     first = ev[0]
+
+    def alias(value):
+        if not isinstance(value, str) or not value:
+            return value
+        return summary.file_alias(value, rep.get('root') if rep else None,
+                                  rep.get('home') if rep else None)
+
     if isinstance(first, dict):
         if isinstance(first.get('file'), str):
-            loc = first['file']
-            if first.get('line') is not None:
-                loc += ':' + str(first['line'])
+            loc = alias(first['file'])
+            line = first.get('line') if first.get('line') is not None \
+                else first.get('error_line')
+            if line is not None:
+                loc += ':' + str(line)
             return loc
         if isinstance(first.get('path'), str):
-            return first['path']
+            return alias(first['path'])
+        if isinstance(first.get('repo'), str):
+            # the audited folder itself is listed under '.'
+            return ('the audited folder' if first['repo'] in ('.', '')
+                    else alias(first['repo']))
+        if isinstance(first.get('paths'), list):
+            shown = [alias(x) for x in first['paths'][:3] if isinstance(x, str)]
+            more = len(first['paths']) - len(shown)
+            return ', '.join(x for x in shown if x) + (
+                ', +%d more' % more if more > 0 else '')
     return _first_string(first)
 
 
@@ -147,9 +173,16 @@ def _gate_table(rep):
     for g in rep.get('gates', []):
         gid = g.get('gid', '?')
         name = g.get('name', '')
-        lines.append('| {} | {} | {} | `{}` |'.format(
-            _cell(gid), _cell(name), _cell(g.get('status', 'unknown')),
-            _cell(_evidence_line(g), EVIDENCE_TRUNC)))
+        status = g.get('status', 'unknown')
+        reason = g.get('status_reason')
+        if status in ('unknown', 'not_applicable') and reason:
+            # say why the gate did not pass or does not apply, in words
+            note = ('Not checked: %s' if status == 'unknown' else '- %s') % reason
+            evidence = _cell(note, EVIDENCE_TRUNC)
+        else:
+            evidence = '`{}`'.format(_cell(_evidence_line(g), EVIDENCE_TRUNC))
+        lines.append('| {} | {} | {} | {} |'.format(
+            _cell(gid), _cell(name), _cell(status), evidence))
     return lines
 
 
@@ -163,7 +196,7 @@ def _critical_table(rep):
     for f in rows:
         lines.append('| {} | {} | {} | {} |'.format(
             _cell(f.get('fid', '')), _cell(f.get('severity', '')),
-            _cell(f.get('title', '')), _cell(_finding_location(f))))
+            _cell(f.get('title', '')), _cell(_finding_location(f, rep))))
     return lines
 
 
@@ -171,13 +204,14 @@ def _all_findings_table(rep):
     rows = sorted(rep.get('findings_detailed', []),
                   key=lambda f: (SEVERITY_RANK.get(f.get('severity'), 99),
                                  f.get('fid', '')))
-    lines = ['| fid | gate | severity | status | title |',
-             '| --- | --- | --- | --- | --- |']
+    lines = ['| fid | gate | severity | status | title | location | what to do |',
+             '| --- | --- | --- | --- | --- | --- | --- |']
     for f in rows:
-        lines.append('| {} | {} | {} | {} | {} |'.format(
+        lines.append('| {} | {} | {} | {} | {} | {} | {} |'.format(
             _cell(f.get('fid', '')), _cell(f.get('gate', '')),
             _cell(f.get('severity', '')), _cell(f.get('status', '')),
-            _cell(f.get('title', ''))))
+            _cell(f.get('title', '')), _cell(_finding_location(f, rep)),
+            _cell(f.get('recommendation', ''), ACTION_TRUNC)))
     return lines
 
 
@@ -223,11 +257,30 @@ def _actions_section(rep):
         key=lambda f: (SEVERITY_RANK.get(f.get('severity'), 99),
                        f.get('fid', '')))
     for f in findings:
-        add(f"[{f.get('fid', '?')}]", f.get('recommendation', ''))
+        text = f.get('recommendation', '')
+        spot = _finding_location(f, rep)
+        if f.get('severity') == 'critical' and spot:
+            # the most serious findings start with where the problem is
+            text = '%s: %s' % (spot, text)
+        add(f"[{f.get('fid', '?')}]", text)
+    # a gate whose failures are already listed above does not repeat its
+    # generic advice (it used to ask for a pre-commit hook in folders
+    # that hold no repository at all)
+    explained = {f.get('gate') for f in rep.get('findings_detailed', [])
+                 if f.get('status') == 'fail'}
     for g in rep.get('gates', []):
-        if g.get('status') == 'fail':
+        if g.get('status') == 'fail' and g.get('gid') not in explained:
             add(f"[{g.get('gid', '?')}]", g.get('recommendation', ''))
-    return [f"{i}. {a}" for i, a in enumerate(actions, 1)]
+    numbered = [f"{i}. {a}" for i, a in enumerate(actions, 1)]
+    fixable = [f.get('fid') for f in rep.get('findings_detailed', [])
+               if f.get('autofix_available') and f.get('status') == 'warn']
+    if fixable:
+        numbered.append('')
+        numbered.append(
+            'A planned fix exists for %s: ask for `fix <fid>` to see its plan. '
+            'Nothing is applied without your confirmation.'
+            % ', '.join(str(x) for x in fixable[:10]))
+    return numbered
 
 
 def generate_markdown(rep):

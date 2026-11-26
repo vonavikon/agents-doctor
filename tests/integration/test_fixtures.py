@@ -351,11 +351,16 @@ class FixtureIntegrationTest(unittest.TestCase):
         _r, _h, _e, rep_clean = self.scan(
             lambda ws: fixtures.f12_injection(ws, inject=False))
 
-        # injection files change nothing in the verdicts
+        # injection files change nothing in the verdicts. Every short
+        # instruction file gets its informational hint (status pass), so
+        # the injected file has one more of those than the twin: hints
+        # are left out of the comparison
+        def verdicts(rep):
+            return [(f['check_id'], f['status']) for f in rep['findings_detailed']
+                    if f.get('check_id') != 'RUL_SHORT_FILE_HINT']
+
         self.assertEqual(gate_statuses(rep_clean), inj_statuses)
-        self.assertEqual(
-            [(f['fid'], f['status']) for f in rep_clean['findings_detailed']],
-            [(f['fid'], f['status']) for f in rep_inj['findings_detailed']])
+        self.assertEqual(verdicts(rep_clean), verdicts(rep_inj))
         self.assertEqual(inj_statuses['G3'], 'fail')
 
         # injected directives never reach the output
