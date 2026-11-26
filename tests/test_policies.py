@@ -46,7 +46,7 @@ policy:
 
   content:
     ban_patterns:
-      - 'task\\$'
+      - 'ticket\\$'
       - 'INTERNAL-ID'
 
 custom_rules:
@@ -124,7 +124,7 @@ class FallbackParserTests(_TmpCase):
             "    depth: 2",
             "    ratio: 0.5",
             "    nothing: null",
-            "    text: 'task\\$'",
+            "    text: 'ticket\\$'",
         ])
         with mock.patch.object(policies, 'yaml', None):
             data = policies.parse_policy_file(self.policy(text))
@@ -134,7 +134,7 @@ class FallbackParserTests(_TmpCase):
         self.assertEqual(pol['limits']['depth'], 2)
         self.assertEqual(pol['limits']['ratio'], 0.5)
         self.assertIsNone(pol['limits']['nothing'])
-        self.assertEqual(pol['limits']['text'], 'task\\$')
+        self.assertEqual(pol['limits']['text'], 'ticket\\$')
 
     def test_comments_full_line_and_trailing(self):
         text = '\n'.join([
@@ -491,13 +491,13 @@ class PermissionsDomainTests(_TmpCase):
 
 class ContentDomainTests(_TmpCase):
     POLICY = ("version: 1\npolicy:\n  content:\n    ban_patterns:\n"
-              "      - 'task\\$'\n      - 'INTERNAL-ID'\n")
+              "      - 'ticket\\$'\n      - 'INTERNAL-ID'\n")
 
     def _write_agents(self, text):
         (self.root / 'AGENTS.md').write_text(text, encoding='utf-8')
 
     def test_banned_pattern_violates_with_file_line_and_match(self):
-        self._write_agents('line one\nsee task$2293602 for details\n')
+        self._write_agents('line one\nsee ticket$2293602 for details\n')
         report = policies.evaluate_policies(
             self.scan(), self.root, [self.policy(self.POLICY)])
         viols = _violations(report, 'POL-CONTENT-BAN-PATTERNS')
@@ -505,7 +505,7 @@ class ContentDomainTests(_TmpCase):
         ev = viols[0]['evidence'][0]
         self.assertEqual(ev['file'], 'AGENTS.md')
         self.assertEqual(ev['line'], 2)
-        self.assertEqual(ev['match'], 'task$')  # re.search match itself
+        self.assertEqual(ev['match'], 'ticket$')  # re.search match itself
 
     def test_clean_files_pass(self):
         self._write_agents('nothing forbidden here\n')
@@ -747,7 +747,7 @@ class UnknownFieldsTests(_TmpCase):
 class DeterminismTests(_TmpCase):
     def test_two_runs_produce_identical_reports(self):
         pol = self.policy(TARGET_POLICY)
-        (self.root / 'AGENTS.md').write_text('task$1 and INTERNAL-ID\n'
+        (self.root / 'AGENTS.md').write_text('ticket$1 and INTERNAL-ID\n'
                                              'inner-project too\n',
                                              encoding='utf-8')
         (self.root / '.mcp.json').write_text(
