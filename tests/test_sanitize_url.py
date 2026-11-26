@@ -45,7 +45,7 @@ URL_CASES = [
     # IPv6 hostport kept verbatim
     ('https://[::1]:8443/mirror.git', 'https://[::1]:8443/mirror.git'),
     # standard git@github scp form: untouched
-    ('git@github.com:naumen/office-ai.git', 'git@github.com:naumen/office-ai.git'),
+    ('git@github.com:example/docs-kit.git', 'git@github.com:example/docs-kit.git'),
     # scp with plain user: kept
     ('deploy@server.example.com:repo.git', 'deploy@server.example.com:repo.git'),
     # scp with token-like user: user masked
@@ -93,7 +93,7 @@ HAS_CRED_FALSE = [
     'https://example.com/org/repo.git',
     'https://john@example.com/p.git',                  # plain username
     'ssh://git@gitlab.example.com:22/group/proj.git',  # plain username
-    'git@github.com:naumen/office-ai.git',
+    'git@github.com:example/docs-kit.git',
     'deploy@server.example.com:repo.git',
     'server.example.com:repo.git',
     '/srv/git/repos/tool.git',

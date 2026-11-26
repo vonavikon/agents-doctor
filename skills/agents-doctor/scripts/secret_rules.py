@@ -23,7 +23,7 @@ Documented deviations from raw legacy behavior:
   skipped by find_rule. The rule regexes themselves are unchanged;
   this is a post-filter applied to the literal rules (SEC-005,
   SEC-101) only.
-- Values containing angle-bracket placeholders ('<ключ naomi>') are
+- Values containing angle-bracket placeholders ('<access key>') are
   skipped as documentation, exactly like '${...}' template values: a
   placeholder quoted after a keyword is a docs example, not a secret.
 - SEC-001 requires a non-token character (or line start) before
@@ -197,8 +197,8 @@ def _is_weak_literal(match):
 def _is_placeholder(match):
     """True for configuration examples, not live secrets: a ${...}
     substitution anywhere in the match, or an angle-bracket placeholder
-    inside the quoted value of a literal rule ('Bearer <ключ naomi>',
-    '"<токен портала>"'). Real token alphabets never contain <>."""
+    inside the quoted value of a literal rule ('Bearer <access key>',
+    '"<portal token>"'). Real token alphabets never contain <>."""
     if '${' in match.group(0):
         return True
     value = _match_value(match)
@@ -288,8 +288,8 @@ PARITY_CORPUS = [
     ('uskorit-vypusk-dokumentacii-po-ekosisteme', None),
     ('zadacha-sroki-vypusk-dokumentacii-v-ekosisteme', None),
     # angle-bracket placeholder quoted after a keyword: docs example
-    ('"Authorization": "Bearer <ключ naomi>"', None),
-    ('GRAMAX_API_TOKEN: "<токен портала целиком>"', None),
+    ('"Authorization": "Bearer <access key>"', None),
+    ('WIKI_API_TOKEN: "<portal access token>"', None),
     # canonical PostgreSQL manual connection-string example
     ('postgresql://user:secret@localhost:5432/mydb', None),
 ]

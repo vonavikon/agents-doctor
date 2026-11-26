@@ -47,7 +47,7 @@ policy:
   content:
     ban_patterns:
       - 'task\\$'
-      - 'NSDPRJ'
+      - 'INTERNAL-ID'
 
 custom_rules:
   - id: POL-CUSTOM-001
@@ -491,7 +491,7 @@ class PermissionsDomainTests(_TmpCase):
 
 class ContentDomainTests(_TmpCase):
     POLICY = ("version: 1\npolicy:\n  content:\n    ban_patterns:\n"
-              "      - 'task\\$'\n      - 'NSDPRJ'\n")
+              "      - 'task\\$'\n      - 'INTERNAL-ID'\n")
 
     def _write_agents(self, text):
         (self.root / 'AGENTS.md').write_text(text, encoding='utf-8')
@@ -747,7 +747,7 @@ class UnknownFieldsTests(_TmpCase):
 class DeterminismTests(_TmpCase):
     def test_two_runs_produce_identical_reports(self):
         pol = self.policy(TARGET_POLICY)
-        (self.root / 'AGENTS.md').write_text('task$1 and NSDPRJ\n'
+        (self.root / 'AGENTS.md').write_text('task$1 and INTERNAL-ID\n'
                                              'inner-project too\n',
                                              encoding='utf-8')
         (self.root / '.mcp.json').write_text(
