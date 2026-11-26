@@ -6,11 +6,6 @@ follow semantic versioning.
 
 ## [Unreleased]
 
-- The detector corpus and two test modules use neutral examples instead
-  of names of internal services and of an internal project address.
-  Detection is unchanged: the secret quality bench gives the same
-  verdict.
-
 ## [3.1.0] - 2026-11-26
 
 Plain-language reports and a check that no longer states what it did
@@ -125,6 +120,10 @@ only) and every old CLI flag works as before.
   its description broke the YAML, so a harness could not read the
   description. Fixed, and a test now parses the shipped SKILL.md and
   command frontmatter with both parsers (PyYAML and the fallback).
+- The detector corpus and two test modules use neutral examples instead
+  of names of internal services and of an internal project address.
+  Detection is unchanged: the secret quality bench gives the same
+  verdict.
 
 ### Evaluation
 
