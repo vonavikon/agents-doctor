@@ -4,6 +4,127 @@ All notable changes to agents-doctor are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions
 follow semantic versioning.
 
+## [Unreleased]
+
+## [3.1.0] - 2026-11-26
+
+Plain-language reports and a check that no longer states what it did
+not verify. Backward compatible: the scan keeps its schema (new fields
+only) and every old CLI flag works as before.
+
+### Plain-language flow
+
+- One `audit` command writes three files: the scan (`--out`), the
+  technical report (`--report`) and the plain-language report for a
+  non-technical reader (`--human`, `--lang ru|en`). The plain report
+  leads with the key, gives "where" and "what to do" for every finding,
+  ends with "where to start", and lists what can be improved.
+- `audit --summary` prints a digest of a few kilobytes instead of the
+  full scan: gate statuses with reasons, findings with a file alias
+  relative to the audited folder, what to do, suggestions, where to
+  start. No absolute paths, no quoted file lines, no secrets. The digest
+  says whether the audited folder is in git, names every place a step
+  applies to, and counts the keys beyond the first ones per file.
+- `explain <id>` prints the same short card; `--raw` keeps the full
+  record. New `summary` subcommand builds the digest from a finished
+  scan.
+- `references/glossary.md`: plain names (EN/RU) for every gate, finding
+  kind and "not checked" reason. `tools/gen_glossary.py --check` in CI
+  keeps it in step with the code.
+- Every finding carries a stable `check_id` (the finding type, e.g.
+  `SEC_EXPOSED_SECRET`). `fid` stays a per-scan counter and remains the
+  id for `explain` and `fix`.
+- SKILL.md and the slash command: one command, read the digest, answer
+  in the user's language, findings named in words.
+- The plain report lists the user's own findings first; findings inside
+  installed plugins are counted in one line (before, a broken skill of a
+  plugin could be "the main problem"). Keys in files that `.gitignore`
+  keeps out are not counted as "left in plain sight": the report names
+  them in a line of their own. At most three bullets of one kind are
+  spelled out, the rest is a count.
+
+### Correctness
+
+- Broken SKILL.md frontmatter reports the position of the syntax error
+  (file, line, the parser's own message) instead of "name and
+  description missing". Fields are judged only after a successful
+  parse. The user's line text never enters the record or the reports.
+- No skill folders or no skills found: gate 5 is `not_applicable` with
+  a reason, never `pass`. An unreadable or truncated skill folder makes
+  the gate `unknown`. The skill folder cap is 1000 (was 200) and a
+  truncated folder is reported.
+- Claude Code `@~/` imports resolve against the scanner's `--home`. A
+  target outside the audited area is reported as outside
+  (`CLAUDE_IMPORT_OUTSIDE`, low severity, unverified), not as missing,
+  and is not read.
+- A folder without Git: no "install a pre-commit hook" advice, secret
+  prevention is `not_applicable`, secrets in files are still reported.
+  Repositories nested inside a plain folder are "unverified", not
+  "absent".
+- The audited folder itself, when it is a git repository (the usual
+  project folder), gets its git side read like any other repository:
+  status, remote, hooks, index, history with `--deep`. Before, only the
+  clones inside it were read, so tracked folders were reported as
+  "outside version control", tracked large files as "without backup",
+  and the folder's own hooks and uncommitted work were never seen. The
+  folder is listed first in `top_level` under the name `.`.
+- Repositories deeper than the first level are not read: a clean result
+  that leaves them out is `unknown`, never `pass`.
+- A nested repository that the outer repository's `.gitignore` keeps out
+  (a vendored clone) is not reported as "nested".
+- What to do about a key follows the facts (`secrets[].git`): in a
+  tracked file, rotate and take it out of the project (reported once,
+  not again from the index); not added yet, add the file to `.gitignore`
+  (`critical`, as before); kept out by `.gitignore`, a `medium` hint
+  (the usual place for local settings, a risk only when the file is
+  shared). Without a repository around the file the detection is
+  `critical`, `fail`, as before.
+- The plugin's own source tree is not scanned for keys, in the worktree
+  or in the git index: its test corpus of fake keys is not user data. A
+  folder counts as the plugin's source only when it holds both
+  `audit_scan.py` and `secret_rules.py`. The worktree scan counts the
+  files it left out (`stats.own_source_skipped`) and the digest says so,
+  with the number.
+- A keyword-literal hit from the git index in a tracked file of 1 MB or
+  more (a bundle, a minified library) is a `low` "look at the line by
+  hand" finding (`SEC_TRACKED_SECRET_BUNDLE`), not `critical`. The
+  worktree scan does not read such files either. Real hits are listed
+  first.
+- When the audited folder is a repository and `.agents-doctor/` is not
+  kept out by `.gitignore`, the digest and the plain report suggest
+  adding it (the snapshot holds paths of the machine).
+- "Not checked" says why (no facts, search truncated, history partially
+  scanned) in the digest, the technical report and the plain report.
+- The plain report names the checks that could not run: one sentence in
+  its short version and a section with the reason for each check,
+  in English and in Russian. A check that could not run inside a red or
+  yellow gate is listed there too, with its place and what to do.
+  Checks that do not apply stay out.
+- The scan's `rules_version` is `3.1.0`: rule outcomes change in this
+  release.
+- A short instruction file (under 2 KB) with a low signal ratio is an
+  informational hint, not a warning. Size is counted in bytes. Every
+  instruction file with few concrete rules gets a line of its own (before:
+  one line for the worst file only, which left the others without a
+  place to look).
+- The tool's own `.agents-doctor/` and `.agents-doctor-trash/` are not
+  reported as "top-level folders outside version control".
+- Dedup: files already read in full are not opened a second time.
+- `audit` creates a missing output folder (`.agents-doctor/` on a first
+  run) instead of failing.
+- The slash command's frontmatter never parsed: an unquoted "also:" inside
+  its description broke the YAML, so a harness could not read the
+  description. Fixed, and a test now parses the shipped SKILL.md and
+  command frontmatter with both parsers (PyYAML and the fallback).
+
+### Evaluation
+
+- LLM-eval v4: the model gets the digest, not the scan; answers are
+  graded by `llm-eval/grade_answer.py` against rubric A1-A12. The
+  offline CI run requires good samples to pass every critical check,
+  bad samples to be caught and malformed input to be rejected.
+- 1429 tests, QA eval 267 PASS.
+
 ## [3.0.1] - 2026-11-18
 
 False-positive fixes found by scanning a real production workspace

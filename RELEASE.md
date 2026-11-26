@@ -13,18 +13,26 @@ the human part.
    tools/validate_manifest.py` fails when they do not.
 3. Update `CHANGELOG.md`: move the Unreleased entries under the new
    version with today's date, start a fresh Unreleased section.
-4. Regenerate `docs/sample-report.md` so it shows the current report
-   format: rebuild the demo workspace, scan it, run the report generator
-   over the demo scan JSON, and commit the result.
+4. Regenerate the sample reports so they show the current format (both
+   read the chaos fixture): `python tools/gen_sample_report.py` and
+   `python tools/gen_sample_human_report.py`. Commit the results.
 5. Run the local full suite and the evals:
 
    ```
    python -m unittest discover -s tests -v
-   cd qa && python eval.py
-   python llm-eval/grade_report.py <report> llm-eval/fixtures/chaos.json
+   python qa/eval.py
+   python llm-eval/run_eval.py --model offline
    python tools/check_links.py
    python tools/validate_manifest.py
+   python tools/validate_schema.py llm-eval/fixtures/chaos.json
+   python tools/gen_harness_matrix.py --check
+   python tools/gen_glossary.py --check
+   python tools/check_readme_facts.py --check
    ```
+
+   When the scanner or the skill text changed, refresh the LLM-eval
+   fixtures first (`python llm-eval/make_fixtures.py`): the digest and
+   the sample answers are graded against the committed scans.
 
 ## Tag and release
 

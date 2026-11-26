@@ -1,6 +1,6 @@
 {
   "name": "agents-doctor",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "description": "Doctor for AI agent workspaces: AGENTS.md health check, leaked secrets (HMAC, redacted), safe cleanup with restore, SARIF for CI, plain-language report EN/RU. Claude Code / Z Code. Read-only.",
   "author": {
     "name": "vonavikon"
