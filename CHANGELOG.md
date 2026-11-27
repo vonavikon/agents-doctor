@@ -14,7 +14,7 @@ follow semantic versioning.
   status and severity are drawn icons in the system colours, and every one
   keeps its word. Structure, keyboard model, selectors and copy are the
   same as before.
-- Inter is bundled (`ui/static/fonts/`, SIL Open Font License 1.1) for
+- Inter is bundled (`ui/static/assets/fonts/`, SIL Open Font License 1.1) for
   systems without San Francisco. Apple devices keep their system font. The
   server sends font files with a font media type.
 - The treemap scale, the score gauge, the trend chart and the chain

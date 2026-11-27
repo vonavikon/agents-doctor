@@ -303,7 +303,7 @@ class HttpSecurityTest(unittest.TestCase):
 
     def test_static_font_served_with_font_media_type(self):
         status, headers, body = _request(
-            self.port, 'GET', '/static/fonts/InterVariable.woff2')
+            self.port, 'GET', '/static/assets/fonts/InterVariable.woff2')
         self.assertEqual(status, 200)
         # a font that arrives as text/plain is refused by the browser
         # under nosniff
@@ -317,10 +317,11 @@ class HttpSecurityTest(unittest.TestCase):
         self.assertEqual(body[:4], b'wOF2')
 
     def test_static_rejects_dotdot_under_fonts(self):
-        # two levels up from static/fonts sits ui/server.py: plain and
-        # percent-encoded, since the router decodes before it resolves
-        for path in ('/static/fonts/../../server.py',
-                     '/static/fonts/%2e%2e/%2e%2e/server.py'):
+        # three levels up from static/assets/fonts sits ui/server.py:
+        # plain and percent-encoded, since the router decodes before it
+        # resolves
+        for path in ('/static/assets/fonts/../../../server.py',
+                     '/static/assets/fonts/%2e%2e/%2e%2e/%2e%2e/server.py'):
             status, _, body = _request(self.port, 'GET', path)
             self.assertEqual(status, 403, path)
             self.assertEqual(json.loads(body), {'error': 'forbidden'})

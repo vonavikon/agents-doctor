@@ -19,10 +19,10 @@ repository, <https://github.com/rsms/inter>.
 
 ## Use in the stylesheet
 
-`../style.css` declares the font:
+`../../style.css` declares the font:
 
 ```css
-@font-face { font-family: "Inter"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("./fonts/InterVariable.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("./assets/fonts/InterVariable.woff2") format("woff2"); }
 ```
 
 `index.html` preloads the file, so every system downloads it.

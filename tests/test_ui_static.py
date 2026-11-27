@@ -79,7 +79,7 @@ class BundledFontTest(unittest.TestCase):
     """The web font ships inside the plugin zip, with its license."""
 
     def test_font_file_present_and_plausible(self):
-        font = UI / 'fonts' / 'InterVariable.woff2'
+        font = UI / 'assets' / 'fonts' / 'InterVariable.woff2'
         self.assertTrue(font.is_file())
         blob = font.read_bytes()
         self.assertGreaterEqual(len(blob), 100 * 1024)
@@ -89,7 +89,7 @@ class BundledFontTest(unittest.TestCase):
         self.assertEqual(blob[:4], b'wOF2')
 
     def test_license_beside_the_font(self):
-        path = UI / 'fonts' / 'LICENSE-Inter.txt'
+        path = UI / 'assets' / 'fonts' / 'LICENSE-Inter.txt'
         self.assertTrue(path.is_file())
         text = path.read_text(encoding='utf-8')
         self.assertIn('SIL OPEN FONT LICENSE', text)
