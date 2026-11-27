@@ -30,6 +30,14 @@ follow semantic versioning.
   `aria-label`.
 - The tooltip title of a chain diagram box was never a child of its box.
 - The Rescan button changes only its label while a rescan runs.
+- A second visit to the Compare tab came back empty: the first request
+  stripped the fingerprints from the stored scan.
+- The overview listed every known environment as detected: it filtered a
+  status the scanner never writes. It now lists the detected and the
+  possible environments and waits for the answer instead of showing "none
+  detected" first.
+- A harness without any instruction source at the target showed a bare
+  name on the Simulate tab; the block now says so.
 
 ### Documentation
 

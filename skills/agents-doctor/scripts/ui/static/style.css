@@ -45,8 +45,9 @@
   --on-accent: #ffffff;
   /* accent */
   --accent: #007aff;
-  --accent-hover: #0071ee;
-  --accent-active: #0066d6;
+  /* fill of the prominent button: white text keeps 4.5:1 on both steps */
+  --accent-fill: #0066d6;
+  --accent-fill-hover: #0071ee;
   --accent-dim: rgba(0, 122, 255, 0.14);
   --accent-text: #0040dd;           /* accent used as text: links, active view */
   /* state fills: dots, bars, rings, chips, chart lines */
@@ -60,7 +61,7 @@
   --sev-critical: var(--red); --sev-high: var(--orange);
   --sev-medium: var(--yellow); --sev-low: var(--blue); --sev-info: var(--gray);
   --pass: var(--green); --fail: var(--red); --warn: var(--orange);
-  --unknown: var(--purple); --na: var(--gray);
+  --na: var(--gray);
   --score-good: var(--green); --score-mid: var(--orange); --score-bad: var(--red);
   --series-total: var(--accent);
   --series-critical: var(--red);
@@ -70,7 +71,7 @@
   /* type, shape, motion */
   --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Cascadia Mono", "Liberation Mono", monospace;
-  --text-11: 11px; --text-12: 12px; --text-13: 13px; --text-15: 15px; --text-20: 20px; --text-28: 28px;
+  --text-11: 11px; --text-12: 12px; --text-13: 13px; --text-15: 15px; --text-28: 28px;
   --radius-control: 6px; --radius-surface: 10px;
   --duration-fast: 150ms; --duration: 200ms; --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
   --selection: rgba(0, 122, 255, 0.20);
@@ -112,8 +113,8 @@
     --text-secondary-strong: #c7c7cc;
     --placeholder: #a6a6ab;
     --accent: #0a84ff;
-    --accent-hover: #2a95ff;
-    --accent-active: #0074e3;
+    --accent-fill: #0071e6;
+    --accent-fill-hover: #0a74e0;
     --accent-dim: rgba(10, 132, 255, 0.16);
     --accent-text: #5aa8ff;
     --red: #ff453a; --orange: #ff9f0a; --yellow: #ffd60a; --green: #30d158;
@@ -241,19 +242,8 @@ button { font: inherit; color: inherit; }
   white-space: nowrap;
 }
 .brand-name { font-weight: 600; }
-.brand-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1;
-}
+/* the product's own icon sits before the window title */
+.brand-mark { display: inline-block; flex: none; width: 18px; height: 18px; }
 
 .icon-btn {
   display: inline-flex;
@@ -299,6 +289,16 @@ button { font: inherit; color: inherit; }
 .btn-accent:disabled { color: var(--text-faint); cursor: default; }
 /* the word of a button never wraps, not while it reads "Rescanning..." */
 .btn-label { white-space: nowrap; }
+/* the one prominent push button of a view (Run): filled, white label */
+.btn-accent.btn-primary {
+  border-color: transparent;
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.btn-accent.btn-primary:hover:not(:disabled) { background: var(--accent-fill-hover); }
+.btn-accent.btn-primary:active:not(:disabled) { background: var(--accent-fill); }
+.btn-accent.btn-primary:disabled { background: color-mix(in srgb, var(--accent-fill) 45%, var(--surface)); color: var(--on-accent); }
 #btn-rescan { grid-row: 1; grid-column: 3; justify-self: end; }
 #btn-rescan:disabled { cursor: progress; }   /* rescanning */
 
@@ -330,7 +330,9 @@ button { font: inherit; color: inherit; }
 .chips-label { color: var(--text-muted); font-size: var(--text-12); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
-/* capsule chip: dot, word, tabular count; pressed = coloured border and tint */
+/* capsule chip: dot, word, tabular count. On and off differ by more than
+   colour: on is the primary text, a solid dot and a drawn check; off is
+   the muted text and a hollow dot */
 .chip {
   display: inline-flex;
   align-items: center;
@@ -340,24 +342,42 @@ button { font: inherit; color: inherit; }
   border: 1px solid var(--border);
   border-radius: 11px;
   background: var(--surface);
-  color: var(--text);
+  color: var(--text-muted);
   font-size: var(--text-12);
   line-height: 1;
   cursor: pointer;
   transition: background-color var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease);
 }
-.chip:hover { background: var(--surface-hover); }
+.chip:hover { background: var(--surface-hover); color: var(--text); }
 .chip:active { background: var(--surface-active); }
 .chip:focus-visible { outline-offset: 1px; }
-.chip-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--chip-color, var(--na)); }
-.chip-count { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.chip-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--chip-color, var(--na));
+}
+.chip-count { font-variant-numeric: tabular-nums; }
 .chip[aria-pressed="true"] {
+  padding-right: 7px;
   border-color: var(--chip-color, var(--accent));
   background: color-mix(in srgb, var(--chip-color, var(--accent)) 16%, var(--surface));
+  color: var(--text);
+  font-weight: 600;
 }
 .chip[aria-pressed="true"]:hover { background: color-mix(in srgb, var(--chip-color, var(--accent)) 24%, var(--surface)); }
-/* muted text does not hold on a tint in the dark appearance */
-.chip[aria-pressed="true"] .chip-count { color: var(--text); }
+.chip[aria-pressed="true"] .chip-dot { background: var(--chip-color, var(--accent)); box-shadow: none; }
+.chip[aria-pressed="true"]::after {
+  content: "";
+  flex: none;
+  width: 12px;
+  height: 12px;
+  background-color: currentColor;
+  -webkit-mask: var(--i-check) center / contain no-repeat;
+  mask: var(--i-check) center / contain no-repeat;
+}
 
 /* ---------------------------------------------------------- layout, panels */
 
@@ -387,6 +407,16 @@ button { font: inherit; color: inherit; }
   padding: 10px 16px 16px;
 }
 .panel-body > :first-child { margin-top: 0; }
+/* a panel body that can still scroll sideways fades at its right edge;
+   app.js sets and clears the class from the scroll position and names the
+   width of a classic vertical scrollbar in --sbw: the fade stops at the
+   scrollbar, which stays fully visible on an opaque track */
+.panel-body.scrolls-x {
+  --fade-end: calc(100% - var(--sbw, 0px));
+  -webkit-mask-image: linear-gradient(to right, #000 calc(var(--fade-end) - 28px), transparent var(--fade-end), #000 var(--fade-end));
+  mask-image: linear-gradient(to right, #000 calc(var(--fade-end) - 28px), transparent var(--fade-end), #000 var(--fade-end));
+  scrollbar-color: var(--scrollbar-thumb) var(--window);
+}
 
 /* text field and pop-up button */
 .input {
@@ -610,7 +640,7 @@ input[type="search"].input { appearance: none; padding-right: 22px; }
 .tbl tbody tr:active { background: var(--surface-active); }
 /* the rows the keyboard can reach: finding rows and recorded scans */
 .tbl tbody tr:is(.fnd-row, .hist-scan-row):focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
-.tbl td.mono { font-size: var(--text-12); }
+.tbl td.mono { font-size: var(--text-12); white-space: nowrap; }
 .tbl .num, .tbl th.num { text-align: right; }
 
 th.sortable { cursor: pointer; }
@@ -695,6 +725,8 @@ tr[data-severity="info"] { --tone: var(--gray); }
 
 #tree-body { padding: 4px 8px 8px; }
 #tree-body:focus-visible { outline-offset: -3px; }
+/* a row that carries the keyboard position is the one focus mark */
+#tree-body:has(.node-focused):focus-visible { outline: none; }
 
 /* a row fits 22px in both tree modes (the flat one sets the height inline) */
 .tree-node-row {
@@ -877,8 +909,8 @@ tr[data-severity="info"] { --tone: var(--gray); }
   border-radius: 4px;
   background: var(--surface);
   color: var(--orange-text);
-  font-size: 10px;
-  line-height: 14px;
+  font-size: var(--text-11);
+  line-height: 15px;
   white-space: nowrap;
 }
 .binary-note { padding: 20px 16px; color: var(--text); }
@@ -1092,9 +1124,9 @@ details.ev-json pre {
   pointer-events: none;
 }
 .tm-sub { position: absolute; inset: 0; }
-.tm-sev-corner { position: absolute; top: 2px; right: 2px; padding: 0 3px; border-radius: 6px; font-size: 10px; line-height: 12px; pointer-events: none; }
+.tm-sev-corner { position: absolute; top: 2px; right: 2px; padding: 0 3px; border-radius: 6px; font-size: var(--text-11); line-height: 13px; pointer-events: none; }
 /* the darkest and the hottest cell both take the primary text colour */
-.tm-size, .tm-partial-mark { color: var(--text); font-size: 10px; font-weight: 500; line-height: 12px; pointer-events: none; }
+.tm-size, .tm-partial-mark { color: var(--text); font-size: var(--text-11); font-weight: 500; line-height: 13px; pointer-events: none; }
 
 .treemap-tooltip {
   position: fixed;
@@ -1189,7 +1221,7 @@ details.ev-json pre {
 
 /* ----------------------------------------------------------------- history */
 
-/* the chart is drawn at the real width of its card, so labels stay 10px */
+/* the chart is drawn at the real width of its card, so labels stay 11px */
 .hist-chart {
   margin: 0 0 12px;
   padding: 12px 16px 8px;
@@ -1202,8 +1234,8 @@ details.ev-json pre {
 /* strokes stay hairline whatever width the chart is scaled to */
 .trend-svg line, .trend-svg polyline { vector-effect: non-scaling-stroke; }
 .trend-grid { stroke: var(--separator); }
-.trend-label { fill: var(--text-muted); font-family: var(--font-sans); font-size: 10px; }
-.trend-legend-text { fill: var(--text); font-family: var(--font-sans); font-size: 10px; font-weight: 500; }
+.trend-label { fill: var(--text-muted); font-family: var(--font-sans); font-size: var(--text-11); }
+.trend-legend-text { fill: var(--text); font-family: var(--font-sans); font-size: var(--text-11); font-weight: 500; }
 /* one variable per series paints its line, its legend swatch and its points */
 .series-total { --series: var(--series-total); }
 .series-critical { --series: var(--series-critical); }
@@ -1228,14 +1260,17 @@ details.ev-json pre {
 /* -------------------------------------------------------------- responsive */
 
 @media (max-width: 1100px) {
-  /* the inspector leaves the side and stacks under the panel */
-  .workspace { flex-direction: column; gap: 12px; padding: 12px 16px 16px; }
+  /* the inspector leaves the side and stacks under the panel; the panel
+     keeps room for its rows and the inspector takes what is left */
+  .workspace { flex-direction: column; gap: 12px; padding: 12px 16px 16px; overflow: auto; }
+  .layout { min-height: 340px; }
   .inspector {
+    flex: 0 1 42vh;
     width: 100%;
+    height: auto;
     min-width: 0;
     max-width: none;
-    height: 42vh;
-    min-height: 220px;
+    min-height: 180px;
     margin-top: 0;
     border: 1px solid var(--separator);
     border-radius: var(--radius-surface);
@@ -1257,13 +1292,13 @@ details.ev-json pre {
 }
 
 @media (max-width: 900px) {
-  /* the toolbar wraps onto two rows: history and views, then title and Rescan */
-  .topbar { display: flex; flex-wrap: wrap; gap: 4px 8px; }
-  .history-nav { position: static; translate: none; order: 0; }
-  .tabs { order: 1; margin-left: 0; }
+  /* two toolbar rows: history, title and Rescan above, the eight views below */
+  .topbar { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 8px; }
+  .history-nav { position: static; translate: none; grid-column: 1; grid-row: 1; }
+  .topbar-brand { grid-column: 2; grid-row: 1; justify-self: start; }
+  #btn-rescan { grid-column: 3; grid-row: 1; }
+  .tabs { grid-column: 1 / -1; grid-row: 2; margin-left: 0; justify-content: space-between; }
   .tab { min-width: 44px; padding: 0 8px; }
-  .topbar-brand { order: 2; }
-  #btn-rescan { order: 3; margin-left: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {

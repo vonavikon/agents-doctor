@@ -2279,6 +2279,10 @@ function renderSimulate(data) {
       row.append(el('span', { class: 'mono subtle', text: '  ' + (l.reason || '') }));
       return row;
     });
+    // a harness with no source at this target says so instead of showing a bare name
+    if (!(chain.loaded || []).length && !(chain.overridden || []).length && !(chain.unloaded || []).length) {
+      block.append(el('p', { class: 'conf-note', text: 'no instruction file loads for this harness at this target' }));
+    }
     body.append(block);
   }
 
@@ -2399,7 +2403,7 @@ function renderInstructionsTable(data) {
           class: 'status-badge st-' + (r.status === 'loaded' ? 'pass' : r.status === 'overridden' ? 'warn' : 'not_applicable'),
           html: `<span class="st-glyph" aria-hidden="true">${r.status === 'loaded' ? '\u2713' : r.status === 'overridden' ? '\u26a0' : '\u2014'}</span><span>${r.status}</span>`,
         })),
-        el('td', { class: 'mono subtle', text: r.reason || '' }),
+        el('td', { class: 'subtle', text: r.reason || '' }),
       );
       tbody.append(tr);
     }
@@ -2686,10 +2690,16 @@ function renderEnvSummary() {
   const box = $('ov-env');
   if (!box) return;
   box.textContent = '';
-  const h = state.harnesses || {};
+  if (!state.harnesses) {
+    // the answer of /api/harnesses is still on its way: not an empty workspace
+    box.innerHTML = loadingHTML('Detecting environments…');
+    return;
+  }
+  const h = state.harnesses;
   const matrix = h.spec_matrix || [];
   const names = new Map(matrix.map((m) => [m.harness_id, m.display_name || m.harness_id]));
-  const detected = (h.detected || []).filter((d) => d && d.status && d.status !== 'not_detected');
+  // the scanner reports 'detected' or 'possible'; only 'not_found' leaves the list
+  const detected = (h.detected || []).filter((d) => d && d.status && d.status !== 'not_found');
   const card = el('div', { class: 'env-card' });
   card.append(el('div', { class: 'ov-section-title', text: 'Detected environments' }));
   const line = el('div', { class: 'env-chips' });
@@ -2922,11 +2932,11 @@ const HIST_DIFF_SECTIONS = [
 /** Findings-per-scan chart: SVG polyline, one point per scan, x scaled
     by scan time, separate lines for total / critical / high. */
 /* W is the inner width of the chart card in pixels: the chart is drawn at
-   its real size, so its labels keep 10px at every window width */
+   its real size, so its labels keep 11px at every window width */
 function trendSvg(points, W) {
   W = Math.max(320, Math.min(1800, W || 760));
   // T leaves the legend its own band above the plot
-  const H = 220, L = 44, Rp = 12, T = 26, B = 34;
+  const H = 220, L = 44, Rp = 12, T = 28, B = 34;
   const iw = W - L - Rp, ih = H - T - B;
   const ts = points.map((p) => Date.parse(p.ts));
   const t0 = Math.min(...ts), t1 = Math.max(...ts);
@@ -2944,7 +2954,7 @@ function trendSvg(points, W) {
   for (const frac of [0, 0.5, 1]) {
     const gy = (T + ih * (1 - frac)).toFixed(1);
     s += `<line x1="${L}" y1="${gy}" x2="${W - Rp}" y2="${gy}" class="trend-grid" stroke-width="1"/>`;
-    s += `<text x="${L - 6}" y="${Number(gy) + 4}" text-anchor="end" font-size="10" class="trend-label">${Math.round(maxV * frac)}</text>`;
+    s += `<text x="${L - 6}" y="${Number(gy) + 4}" text-anchor="end" font-size="11" class="trend-label">${Math.round(maxV * frac)}</text>`;
   }
   for (const sr of series) {
     s += `<polyline points="${line(sr.key)}" class="${sr.class}" stroke-width="1.6"/>`;
@@ -2955,7 +2965,7 @@ function trendSvg(points, W) {
     }
   });
   const xlbl = (i, anchor) => {
-    s += `<text x="${x(i).toFixed(1)}" y="${H - 10}" text-anchor="${anchor}" font-size="10" class="trend-label">${esc(String(points[i].ts || '').slice(0, 10))}</text>`;
+    s += `<text x="${x(i).toFixed(1)}" y="${H - 10}" text-anchor="${anchor}" font-size="11" class="trend-label">${esc(String(points[i].ts || '').slice(0, 10))}</text>`;
   };
   xlbl(0, 'start');
   if (points.length > 2) xlbl(Math.floor((points.length - 1) / 2), 'middle');
@@ -2963,8 +2973,8 @@ function trendSvg(points, W) {
   let lx = L + 4;
   for (const sr of series) {
     s += `<line x1="${lx}" y1="${T - 4}" x2="${lx + 14}" y2="${T - 4}" class="${sr.class}" stroke-width="2"/>`;
-    s += `<text x="${lx + 18}" y="${T - 1}" font-size="10" class="trend-legend-text">${sr.key}</text>`;
-    lx += 30 + sr.key.length * 6;
+    s += `<text x="${lx + 18}" y="${T}" font-size="11" class="trend-legend-text">${sr.key}</text>`;
+    lx += 30 + sr.key.length * 6.6;
   }
   s += '</svg>';
   return s;
@@ -3145,6 +3155,25 @@ function bindUI() {
   });
 
   document.addEventListener('keydown', globalKeydown);
+  watchScrollX();
+}
+
+/* A panel body that can still scroll sideways shows a fade at its right
+   edge (style.css, .panel-body.scrolls-x): the cut content is announced,
+   not lost. The fade leaves when the end of the content is reached. */
+function watchScrollX() {
+  document.querySelectorAll('.panel-body').forEach((body) => {
+    const update = () => {
+      const max = body.scrollWidth - body.clientWidth;
+      body.classList.toggle('scrolls-x', max > 1 && body.scrollLeft < max - 1);
+      // the width of a classic vertical scrollbar (0 for an overlay one)
+      body.style.setProperty('--sbw', (body.offsetWidth - body.clientWidth) + 'px');
+    };
+    body.addEventListener('scroll', update, { passive: true });
+    if (window.ResizeObserver) new ResizeObserver(update).observe(body);
+    if (window.MutationObserver) new MutationObserver(update).observe(body, { childList: true, subtree: true });
+    update();
+  });
 }
 
 function setTreemapMetric(m) {
