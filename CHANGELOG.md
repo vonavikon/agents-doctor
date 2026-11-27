@@ -6,6 +6,12 @@ follow semantic versioning.
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-11-28
+
+The visual explorer in the look of a native macOS application, and six
+defects of the explorer fixed. Backward compatible: the scan keeps its
+schema and every CLI flag works as before.
+
 ### Changed
 
 - The visual explorer looks like a native macOS application and follows
