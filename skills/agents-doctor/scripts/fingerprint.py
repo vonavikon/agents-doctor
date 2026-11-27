@@ -2,8 +2,9 @@
 
 Findings carry fingerprints instead of raw secrets. This module replaces
 the old public-salt SHA-256 with HMAC-SHA256 keyed by a per-installation
-secret: fingerprints stay stable on one machine (baselines, dedup) but
-cannot be computed, compared or rainbow-tabled anywhere else.
+secret: fingerprints stay stable on one machine (the same secret gets the
+same fingerprint in every scan) but cannot be computed, compared or
+rainbow-tabled anywhere else.
 
 Key location (override with the AGENTS_DOCTOR_KEY_PATH environment
 variable; an empty value is ignored - the variable exists for tests and
