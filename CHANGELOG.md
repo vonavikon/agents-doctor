@@ -6,6 +6,17 @@ follow semantic versioning.
 
 ## [Unreleased]
 
+### Documentation
+
+- `docs/policies.md` is written in English. The gap analysis that planned
+  version 2.0 is removed: every item of it has shipped and is documented
+  where it lives.
+- Comments, docstrings and documentation no longer refer to internal
+  planning documents; sample names in the tests and in the examples are
+  neutral.
+- `docs/cli.md` gives the exit codes of the `policy` command, and
+  `docs/policies.md` says before which of them the report is written.
+
 ## [3.1.0] - 2026-11-26
 
 Plain-language reports and a check that no longer states what it did
@@ -145,7 +156,7 @@ keys in the same shapes still fire.
   finding; a left boundary was added. Keys at line start, after a
   quote/space/:= are still detected.
 - SEC-005/SEC-101: values containing an angle-bracket placeholder
-  ('"Bearer <ключ>"') are skipped as documentation, like '${...}'
+  (a quoted "Bearer <key>") are skipped as documentation, like '${...}'
   template values.
 - SEC-102: the canonical documentation credential pair
   'postgresql://user:secret@' (the PostgreSQL manual's own example)
@@ -161,7 +172,7 @@ keys in the same shapes still fire.
 
 ## [3.0.0] - 2026-11-18
 
-Quality, reliability and production readiness (TZ 3.0, five stages).
+Quality, reliability and production readiness.
 Backward compatible: v1 policies, the always-zero policy exits without
 an enforcement block, and audit without new flags behave as 2.1.x.
 
@@ -176,8 +187,8 @@ an enforcement block, and audit without new flags behave as 2.1.x.
 - TreeMap navigation rebuilt: click selects in place, double click
   zooms, Enter/Space activate, Backspace zooms out from anywhere in the
   treemap, breadcrumbs carry data-path, selection survives navigation.
-- Playwright E2E suite (21 scenarios at this stage, 29 by stage 4),
-  console-error gate in every test, chromium + firefox in CI.
+- Playwright E2E suite (29 scenarios), console-error gate in every
+  test, chromium + firefox in CI.
 
 ### Stage 2 — harness conformance
 
@@ -241,11 +252,11 @@ conformance 48/48; E2E green on chromium and firefox.
 
 ## [2.1.0] - 2026-11-17
 
-Security & quality foundation (TZ v2.1 stage 1): policy engine, audit
-history, continuous monitoring, CI/CD integration, security hardening.
+Security & quality foundation: policy engine, audit history,
+continuous monitoring, CI/CD integration, security hardening.
 Backward compatible: audit without new flags behaves exactly as 2.0.0.
 
-### Policy Engine (TZ module 2)
+### Policy Engine
 
 - policies.py: YAML corporate policies without dependencies (PyYAML
   optional, bundled fallback parser); domains: secrets, mcp.allowlist,
@@ -266,7 +277,7 @@ Backward compatible: audit without new flags behaves exactly as 2.0.0.
   [policy] files; `audit --policy f.yml` embeds the compliance
   report into the scan JSON. docs/policies.md.
 
-### Audit history (TZ module 7, local part)
+### Audit history
 
 - audit_history.py: root-local SQLite (<root>/.agents-doctor/
   history.db) with linear migrations; every full audit auto-records
@@ -276,7 +287,7 @@ Backward compatible: audit without new flags behaves exactly as 2.0.0.
   fingerprint diff), --regressions (severity up or pass/warn->fail),
   --trend CSV, --prune retention. docs/history.md.
 
-### Continuous monitoring (TZ module 1)
+### Continuous monitoring
 
 - watch.py: configuration fingerprint (instruction/config files,
   mtime+size) polled every --interval; on change a full scan re-runs
@@ -284,7 +295,7 @@ Backward compatible: audit without new flags behaves exactly as 2.0.0.
   run lands in the history. `--once` is the daemon-free mode for
   cron (rescan only when the stored fingerprint changed).
 
-### CI/CD integration (TZ module 8)
+### CI/CD integration
 
 - audit --fail-on critical|high|medium|low|info: exit 1 after the
   report is written when findings at/above the threshold have status
@@ -296,7 +307,7 @@ Backward compatible: audit without new flags behaves exactly as 2.0.0.
 - Our own CI now dogfoods: the self-audit job runs agents-doctor on
   this repository and uploads the SARIF artifact.
 
-### Security hardening (TZ module 3)
+### Security hardening
 
 - Local UI: Host-header allowlist (DNS-rebinding defense), Origin/
   Referer + Sec-Fetch-Site checks on the mutating endpoint (strict
@@ -308,7 +319,7 @@ Backward compatible: audit without new flags behaves exactly as 2.0.0.
   heuristic flagged as non-verdict; /api/mcp endpoint; embedded into
   every scan (rep['mcp_inventory']).
 
-### Adapter framework (TZ module 9)
+### Adapter framework
 
 - adapter_version field, independent of the product version; shown
   in the generated Harness Support Matrix.
@@ -326,7 +337,7 @@ intelligence, local web UI. Backward compatible: CLI subcommands, JSON
 report shape, fid prefixes and all nine gates preserved; v1 scans still
 compare via --baseline.
 
-### Harness intelligence (TZ phases 1, 5, 7)
+### Harness intelligence
 
 - Adapter registry + documented contract (harness/base.py): detection,
   instruction sources, loading resolution, config files, validation,
@@ -338,13 +349,13 @@ compare via --baseline.
 - Honest detection: markers + activity; one stale file is 'possible',
   never proof of use. Spec matrix generated from the registry
   (tools/gen_harness_matrix.py, docs/HARNESS-MATRIX.md).
-- The four hand-synced harness lists found by the Phase 0 audit are
-  gone; audit_scan/enrich/gates query the registry.
+- The four hand-synced harness lists are gone; audit_scan/enrich/gates
+  query the registry.
 - External adapters: explicit opt-in via .agents-doctor.toml
   [plugins] adapters = [...]; never auto-discovered, isolated on
   failure (harness/external.py).
 
-### Instruction intelligence (TZ phase 2)
+### Instruction intelligence
 
 - Loading simulation per harness for any target directory:
   loaded/overridden/unloaded with reasons, precedence order, labelled
@@ -356,7 +367,7 @@ compare via --baseline.
 - Adapter findings and instruction conflicts join the nine gates with
   stable check_id + harness fields (additive to the report schema).
 
-### Security (TZ phases 3, 11)
+### Security
 
 - Secret detection quality benchmark (bench/secret_quality.py):
   precision/recall/FPR/FNR over a labeled corpus + separately reported
@@ -365,7 +376,7 @@ compare via --baseline.
   gh[pousr]_ GitHub token prefixes, secret_key keyword variant.
 - MCP env-secret detection in Codex config (masked evidence).
 
-### Remediation (TZ phase 4)
+### Remediation
 
 - Crash recovery: incomplete manifest entries detected and recovered
   (rollback or completion, idempotent).
@@ -374,7 +385,7 @@ compare via --baseline.
   trash move; legacy-rules migrations as manual plans).
 - Re-audit after apply: before/after finding counts.
 
-### Local web UI (Visual TZ phases V1-V4)
+### Local web UI
 
 - agents_doctor.py ui: localhost-only server over one scan.json.
   Overview, lazy file tree with aggregated problem counts, findings
@@ -383,7 +394,7 @@ compare via --baseline.
   simulation, baseline comparison. Read-only; fix plans are dry-run.
   Path containment, 256 KB preview cap, no execution of workspace code.
 
-### Runtime health (TZ phase 6)
+### Runtime health
 
 - Opt-in runtime module (runtime_health.py): CLI/python/git presence,
   per-harness CLI binaries (--version, timeout-bounded), static MCP
@@ -524,12 +535,11 @@ The human layer: value-first reporting and safe cleanup.
 
 ## [0.5.0] - 2026-11-16
 
-Stages 4 and 5 of the production-readiness spec: product experience and
-guarded remediation. Full spec coverage complete.
+Product experience and guarded remediation.
 
 ### Added
 
-- Stage-4 modules: `report_generator.py` (markdown report from scan JSON),
+- Product modules: `report_generator.py` (markdown report from scan JSON),
   `sarif.py` (SARIF 2.1.0 export), `agents_doctor.py` (CLI entry with
   `audit --focus/--report`, `compare`, `explain`, `fix`), `remediate.py`
   (plan-only remediation; `--apply` moves to `.agents-doctor-trash/`).
@@ -543,22 +553,22 @@ guarded remediation. Full spec coverage complete.
 
 ## [0.4.0] - 2026-11-16
 
-Audit engine and stage-3 QA.
+Audit engine and QA.
 
 ### Added
 
-- Typed findings and declarative gates (stage 2): `report_model.py` with
+- Typed findings and declarative gates: `report_model.py` with
   schema 1.0, severity and status as separate axes, empty evidence forcing
-  `unknown`; `gates.py` with the nine spec-named gates in `GATE_DEFS`,
+  `unknown`; `gates.py` with the nine gates in `GATE_DEFS`,
   `GATE_POLICY` as the single threshold source, missing facts yielding
   `unknown` never `pass`, and G6 secret prevention held to a warn floor;
   `enrich.py` with config parse integrity and duplicate-key detection,
   heavy dirs outside git, junk classification (confirmed/potentially/unknown
   with git/reference/age signals), capped harness states, skills frontmatter
   via optional PyYAML with an honest fallback.
-- Integration suite (stage 3): 12 fixtures per spec including
-  prompt-injection twins; the suite surfaced 3 real bugs, fixed and pinned
-  by `tests/test_stage3_fixes.py`.
+- Integration suite: 12 fixtures including prompt-injection twins; the
+  suite surfaced 3 real bugs, fixed and pinned by
+  `tests/test_stage3_fixes.py`.
 - Benchmarks: deterministic workspace generator (small/medium/large) and a
   dual-measurement runner (subprocess wall time + tracemalloc peak alloc);
   recorded 817 / 11 964 / 59 634 files.
@@ -590,7 +600,7 @@ Suite at release: 112 tests OK (4 OS-skip), scenario eval 77/77, coverage
 
 ## [0.3.0] - 2026-11-16
 
-Security foundation (stage 1).
+Security foundation.
 
 ### Added
 

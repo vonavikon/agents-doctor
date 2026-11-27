@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Secret detection quality benchmark (TZ 11.3).
+"""Secret detection quality benchmark.
 
 Measures precision / recall / FPR / FNR of the deterministic secret
 rules against a labeled corpus, then stresses the scanner with

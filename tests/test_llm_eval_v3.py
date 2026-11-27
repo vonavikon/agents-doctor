@@ -1,4 +1,4 @@
-"""Stage-3 extension tests for the llm-eval layer: R8-R12, matrix, split.
+"""Tests for the extended llm-eval layer: R8-R12, matrix, split.
 
 Offline-only suite: the online paths are exercised against a mocked
 urllib.request.urlopen, so no test can open a socket or need a key.

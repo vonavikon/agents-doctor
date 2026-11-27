@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-r"""Corporate policy engine for agents-doctor (TZ v2.1.0, enforcement v2).
+r"""Corporate policy engine for agents-doctor (enforcement v2).
 
 A policy is a YAML file that says what a workspace must look like; the
 engine checks a finished audit (scan.json) plus the workspace files
@@ -35,7 +35,7 @@ policies only read facts, they never rescan.
           claude_code: '>=2.1'
           codex: '<2'
       required_skills:
-        - gramax
+        - notes
 
     custom_rules:
       - id: POL-CUSTOM-001
@@ -133,7 +133,7 @@ V2_DOMAIN_FIELDS = ('block_on_failure', 'block_above')
 DOMAIN_ORDER = ('secrets', 'mcp', 'instructions', 'git', 'permissions',
                 'content', 'harness_versions', 'required_skills')
 
-# metadata keys of the policy mapping itself (the TZ format carries a
+# metadata keys of the policy mapping itself (a policy carries a
 # name and a description there); not domains, never active. enforcement
 # is handled separately and only means something in v2 files.
 POLICY_META = ('name', 'description', 'enforcement')

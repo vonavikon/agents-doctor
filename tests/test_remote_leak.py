@@ -1,4 +1,4 @@
-"""Stage-1 e2e: credentials in git remote URLs never reach any artifact.
+"""End-to-end: credentials in git remote URLs never reach any artifact.
 
 The scanner stores only sanitized URLs (sanitize_url.py); the raw value is
 used solely to compute the credentials_in_remote flag. Canary values below

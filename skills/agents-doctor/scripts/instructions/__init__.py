@@ -1,4 +1,4 @@
-"""Instruction Intelligence (Phase 2, TZ section 6).
+"""Instruction Intelligence.
 
 Orchestrates the per-harness adapters into workspace-wide answers:
 - discovery: every instruction source every detected harness may read;
@@ -6,7 +6,7 @@ Orchestrates the per-harness adapters into workspace-wide answers:
   per harness, with the honest 'approximated' label;
 - conflicts: deterministic contradictions and duplication across
   sources, including cross-harness divergence (reported as divergence,
-  never automatically as an error — TZ section 8).
+  never as an error).
 
 The package never invents harness semantics: everything comes from the
 adapters' resolve_chain models.

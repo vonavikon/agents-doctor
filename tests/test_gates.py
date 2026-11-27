@@ -73,7 +73,8 @@ def clean_facts():
                  'md5': 'a' * 32,
                  'path': 'W:/home/.zcode/skills/deploy/SKILL.md',
                  'location': 'user-zcode',
-                 # merged stage-2 keys (the alternative source is skills_extra)
+                 # merged enrichment keys (the alternative source is
+                 # skills_extra)
                  'frontmatter_ok': True, 'missing_fields': [],
                  'dead_refs': [], 'parser': 'yaml'},
             ],
@@ -84,7 +85,7 @@ def clean_facts():
         'chain_budget_over': False,
         'junk': {'files': [], 'dirs': [], 'empty_dirs': []},
         'duplicates': [], 'large_files': [], 'secrets': [],
-        # stage-2 sections present but empty: checked, nothing found
+        # enrichment sections present but empty: checked, nothing found
         'config_integrity': [],
         'heavy_outside_git': [],
         'junk_classified': [],

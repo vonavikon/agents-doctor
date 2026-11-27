@@ -194,7 +194,7 @@ class GithubCopilotAdapter(HarnessAdapter):
         'check only, no full YAML parse)',
     ]
 
-    # --- conformance: how we know each capability (TZ 3.0 section 5).
+    # --- conformance: how we know each capability.
     # No runtime verification exists for this adapter, so 'runtime-tested'
     # never appears; every entry cites where the knowledge comes from.
     CAPABILITY_STATUS = {

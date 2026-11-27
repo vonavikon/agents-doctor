@@ -47,7 +47,7 @@ def collect(root: Path, home: Path, activity: dict | None = None) -> dict:
     (the gates engine allocates ids and validates the shape).
     """
     ctx = HarnessContext(root=Path(root), home=Path(home))
-    # external adapters (TZ 17): explicit opt-in via .agents-doctor.toml
+    # external adapters: explicit opt-in via .agents-doctor.toml
     # [plugins] adapters = [...]; loaded before detection, isolated on
     # failure, reported in the load report below
     plugins_loaded = []

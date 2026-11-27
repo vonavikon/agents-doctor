@@ -388,7 +388,7 @@ class ResearchGuards(SafeCleanCase):
         self.assertTrue(item['cautious'])
 
 
-# --- stage 4: trash runs, manifest, TOCTOU, crash recovery -------------------------
+# --- trash runs, manifest, TOCTOU, crash recovery ----------------------------------
 
 import json  # noqa: E402  (manifest checks)
 
@@ -398,8 +398,9 @@ from unittest import mock  # noqa: E402
 
 def crafted_plan(ws, *items, max_bytes=None):
     """A minimal hand-built plan (no scan): items are (path, action)
-    pairs. Such plans carry no TOCTOU snapshot, like plans built before
-    stage 4; execute() must still handle them safely."""
+    pairs. Such plans carry no TOCTOU snapshot, like plans built
+    before snapshots were added; execute() must still handle them
+    safely."""
     return {'root': str(ws),
             'max_bytes': (max_bytes if max_bytes is not None
                           else safe_clean.DEFAULT_MAX_BYTES),
@@ -590,7 +591,7 @@ class WriteAheadManifest(SafeCleanCase):
 
 
 class RefusedTrashRun(SafeCleanCase):
-    """P0.1: a trash run the pre-operation gate refuses (e.g. the trash
+    """A trash run the pre-operation gate refuses (e.g. the trash
     folder swapped for a symlink, attack d in tests/test_toctou_security)
     is recorded as a failure instead of crashing the batch."""
 
@@ -714,7 +715,7 @@ class LostAccess(unittest.TestCase):
 
 
 class NeverReasonUnit(SafeCleanCase):
-    """Direct unit coverage of the one-word NEVER reasons (spec: the
+    """Direct unit coverage of the one-word NEVER reasons (the
     hard rules are enforced in code, so each gets a direct probe)."""
 
     def test_reasons(self):

@@ -1,4 +1,4 @@
-# Browser E2E tests (Visual TZ section 7, stage 1)
+# Browser E2E tests
 
 `test_ui_e2e.py` drives the real agents-doctor web UI (ui/server.py +
 ui/static) in a headless Chromium through Playwright's sync API, on top
@@ -25,7 +25,7 @@ browser) live in `setUpClass`, and unittest does not run `setUpClass`
 for a skipped class — so a machine without playwright pays nothing,
 and CI jobs that never asked for browser tests stay green.
 
-## What is covered (stage 1)
+## What is covered
 
 Fixture: a temp workspace with dead links in AGENTS.md, a
 `.claude/settings.json` allowing `Bash(*)`, a secrets file with a
@@ -54,9 +54,10 @@ Every test ends by asserting the page produced no console errors and
 no unhandled page errors. The allowlist is empty by default; extend it
 only for browser artifacts, never to silence an app bug.
 
-TreeMap scenarios are deliberately absent at this stage: another work
-stream is reworking the TreeMap renderer, and tests would couple to
-its churn.
+The table lists `MainWorkspaceE2ETest` and `EmptyWorkspaceE2ETest`.
+TreeMap navigation (`TreeMapNavigationE2ETest`), the full analyst path
+(`UserJourneyE2ETest`) and the error and edge scenarios
+(`ErrorPathsE2ETest`) have their own classes in the same module.
 
 ## How the harness works
 

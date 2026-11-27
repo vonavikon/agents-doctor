@@ -1,4 +1,4 @@
-"""Stage-5 tests: remediate.py plan / apply_plan / reaudit and safety rails.
+"""Tests for remediate.py: plan / apply_plan / reaudit and safety rails.
 
 Same tiny fixture as test_cli.py: one git repo (dead link in AGENTS.md,
 empty dir, no .gitignore) plus, for the trash test, an old untracked
@@ -159,10 +159,10 @@ class Unsupported(RemediateCase):
         with self.assertRaises(remediate.UnsupportedError) as cm:
             remediate.plan(rep, 'SEC-001')           # exists: no-prevention warn
         self.assertIn('SEC-001', str(cm.exception))
-        # dead links used to be the unsupported example; since the ТЗ 9.3
-        # remediation stage they plan manual fix_dead_link steps instead
-        # (covered in tests/test_remediation_v3.py), so the unsupported
-        # case here is a finding type with no fix at all
+        # dead links used to be the unsupported example; they now plan
+        # manual fix_dead_link steps instead (covered in
+        # tests/test_remediation_v3.py), so the unsupported case here is
+        # a finding type with no fix at all
         fabricated = {'root': str(self.ws), 'findings_detailed': [{
             'fid': 'RUL-099', 'gate': 'G3', 'category': 'rules',
             'severity': 'low', 'status': 'warn',
@@ -195,7 +195,7 @@ class Containment(RemediateCase):
             remediate.plan(rep, 'HLTH-009')
         step = {'action': 'trash_move', 'target': str(outside),
                 'command': 'move', 'reversible': True, 'note': ''}
-        # since the hardening phase a pre-flight escape is recorded as
+        # a pre-flight escape is recorded as
         # a refused step (same shape as an in-flight refusal), not
         # raised: the caller reads failed[0]['error'] instead of
         # catching ValueError
@@ -250,7 +250,7 @@ class Reaudit(RemediateCase):
         self.assertEqual(new_rep['junk']['empty_dirs'], [])
 
 
-# --- stage 4: trashops-backed moves, TOCTOU, crash recovery -----------------------
+# --- trashops-backed moves, TOCTOU, crash recovery --------------------------------
 
 import json  # noqa: E402  (manifest checks)
 
@@ -263,7 +263,7 @@ def unused_data_rep(ws, *rels):
         'fid': 'HLTH-042', 'gate': 'G9', 'category': 'health',
         'severity': 'low', 'status': 'warn',
         'title': 'Unused data (confirmed_unused): %s' % ', '.join(rels),
-        'description': 'fabricated for stage-4 tests', 'confidence': 0.9,
+        'description': 'fabricated for tests', 'confidence': 0.9,
         'evidence': [{'path': r} for r in rels],
         'recommendation': 'x', 'autofix_available': True}]}
 
@@ -333,7 +333,7 @@ class ToctouRespect(RemediateCase):
 
 
 class PreOpCheckUnit(RemediateCase):
-    """Direct probes of the P0.1 pre-operation gate
+    """Direct probes of the pre-operation gate
     (trashops._pre_operation_check); the attack-level coverage lives in
     tests/test_toctou_security.py."""
 

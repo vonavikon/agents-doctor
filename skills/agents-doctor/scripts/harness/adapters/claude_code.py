@@ -173,7 +173,7 @@ class ClaudeCodeAdapter(HarnessAdapter):
         'no documented instruction context budget',
     ]
 
-    # --- conformance (TZ 3.0 section 5): honesty status per capability.
+    # --- conformance: honesty status per capability.
     # Nothing in this adapter runs against a real Claude Code, so
     # 'runtime-tested' never appears: every claim traces to the
     # Anthropic docs (spec_source) or to a known_limitations entry.

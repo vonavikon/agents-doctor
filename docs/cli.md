@@ -106,8 +106,8 @@ python skills/agents-doctor/scripts/agents_doctor.py simulate <root>
     [--target <dir>] [--harness <id>] [--home <dir>]
 ```
 
-Instruction loading simulation (TZ section 7): prints, per harness, the
-effective instruction set for a target directory — loaded sources with
+Instruction loading simulation: prints, per harness, the effective
+instruction set for a target directory — loaded sources with
 precedence, overridden/unloaded with reasons, and conflicts. Explicitly
 a model: chains follow each harness's documented loading rules, not a
 verified runtime.
@@ -132,9 +132,12 @@ python skills/agents-doctor/scripts/agents_doctor.py policy <scan.json>
 Evaluates corporate policy YAML file(s) against a finished scan and
 writes a compliance report. Without `--policy`, policy packs are
 discovered in installed plugins (`policies/*.yml`) and workspace-level
-`.agents-doctor.toml` `[policy] files`. Exit 0 after writing (gating
-lives in `audit --fail-on` / CI); exit 1 on an unreadable or invalid
-policy file. See [policies.md](policies.md).
+`.agents-doctor.toml` `[policy] files`. The exit code is a contract for
+CI: 0 the check passed or enforcement is off, 1 a blocking rule fired,
+2 a broken or missing policy file, 3 a scan that cannot be read or has
+no root, 4 strict enforcement with rules in status unknown. On 0, 1 and
+4 the report is written or printed first. An I/O error exits 1, as for
+the other subcommands. See [policies.md](policies.md).
 
 ```
 python skills/agents-doctor/scripts/agents_doctor.py history <root>
@@ -190,7 +193,7 @@ audit again afterwards for the before/after report.
 
 Exit codes: 0 success, 1 error, 2 not found or bad usage.
 
-## Report writer: report_generator.py (stage 4)
+## Report writer: report_generator.py
 
 ```
 python skills/agents-doctor/scripts/report_generator.py <scan.json>
@@ -219,7 +222,7 @@ of its own gives the reason for each; checks that do not apply stay
 out. `--after` adds the before/after section for a scan made after a
 cleanup.
 
-## SARIF export: sarif.py (stage 4)
+## SARIF export: sarif.py
 
 ```
 python skills/agents-doctor/scripts/sarif.py <scan.json> [--out scan.sarif]
@@ -228,7 +231,7 @@ python skills/agents-doctor/scripts/sarif.py <scan.json> [--out scan.sarif]
 Exports findings as SARIF 2.1.0 for code viewers that accept it (GitHub
 code scanning, VS Code). Exit 0 written, 1 bad input.
 
-## Remediation: remediate.py (stage 4)
+## Remediation: remediate.py
 
 ```
 python skills/agents-doctor/scripts/remediate.py <scan.json>

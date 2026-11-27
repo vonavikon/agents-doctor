@@ -1,8 +1,8 @@
-/* agents-doctor — Visual Workspace Explorer, phases V1+V2+V3.
+/* agents-doctor — Visual Workspace Explorer.
    Vanilla JS, zero dependencies, fully offline. Served by ui/server.py;
    see the API contract in that file's docstring.
 
-   V3 scale features (TZ 3.0 sections 6.4-6.5): virtualized tree window,
+   Scale features for large workspaces: virtualized tree window,
    cursor pagination with "+N more…" sentinels, whole-workspace search,
    exact directory sizes for the Disk metric via /api/tree/stats, tree
    sorting by name/size/problems. All new endpoints are optional: when
@@ -291,7 +291,7 @@ function renderOverview() {
   addBox('gates warn', gates.filter((g) => g.status === 'warn').length);
   body.append(boxes);
 
-  // Governance dashboard blocks (TZ 3.0 section 10): health score and
+  // Governance dashboard blocks: health score and
   // detected environments. Containers are filled synchronously from the
   // caches when present; the async loaders overwrite them on answer.
   body.append(el('div', { id: 'ov-score' }));
@@ -347,10 +347,10 @@ function renderOverview() {
 
 /* ------------------------------------------------------------------- tree */
 
-/* V3 scale model.
+/* Scale model.
    - loadDir() speaks the paged contract (cursor/complete/total_entries)
      and degrades to the old single-chunk response transparently: no
-     cursor keys -> complete listing, no sentinels, exactly the V2 flow.
+     cursor keys -> complete listing, no sentinels, exactly the old flow.
    - Below TREE_DOM_CAP visible rows the tree renders nested DOM as
      before, with incremental expand/collapse (patchDirNode patches one
      subtree in place, scroll position untouched). Above the cap the
@@ -1022,7 +1022,7 @@ function focusFlatIdx(idx) {
   if (row) setTreeFocus(row);
 }
 
-/* --------------------------------------------------- workspace search (V3) */
+/* --------------------------------------------------------- workspace search */
 
 /* The tree search box doubles as a whole-workspace search when the scope
    select says so. Only the new backend (/api/search) can serve it; on
@@ -2590,7 +2590,7 @@ function renderCompare(cmp, currentFindings) {
   }
 }
 
-/* ------------------------------------------- health score (TZ 3.0, 10.3) */
+/* ------------------------------------------------------------- health score */
 
 function scoreColor(v) {
   if (v == null) return '#646b78';
@@ -2723,7 +2723,7 @@ function renderEnvSummary() {
   box.append(card);
 }
 
-/* ------------------------------------------- history tab (TZ 3.0, 10.x) */
+/* -------------------------------------------------------------- history tab */
 
 const HIST_DIFF_CAP = 10;   // list entries per diff section
 
@@ -3151,7 +3151,7 @@ function setTreemapMetric(m) {
   if (state.treemap.nodes.size) renderTreemap();
 }
 
-/* Inline styles for the V3 aux containers (search results dropdown,
+/* Inline styles for the aux containers (search results dropdown,
    treemap scale legend) — kept out of style.css on purpose. */
 function styleAuxBoxes() {
   const srb = $('tree-search-results');

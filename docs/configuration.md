@@ -44,7 +44,7 @@ Behaviour of the file:
 The reader lives in `skills/agents-doctor/scripts/config.py`
 (`load_config(root)`); see the module docstring for the exact shapes.
 
-A fourth table loads external harness adapters (v2, TZ section 17):
+A fourth table loads external harness adapters:
 
 ```toml
 [plugins]
@@ -79,7 +79,7 @@ Scanner (`skills/agents-doctor/scripts/audit_scan.py`):
 | `--profile` | Per-stage timings to stderr (walk, git, context, enrich, gates). |
 | `--history-depth N` / `--history-all-refs` | Bound/widen the deep history scan; incomplete coverage reads as unknown, never pass. |
 
-Stage-4 CLI entry (`skills/agents-doctor/scripts/agents_doctor.py`):
+Command line entry (`skills/agents-doctor/scripts/agents_doctor.py`):
 
 | Subcommand | Flags | Effect |
 |---|---|---|
@@ -88,7 +88,7 @@ Stage-4 CLI entry (`skills/agents-doctor/scripts/agents_doctor.py`):
 | `explain` | `<scan.json> <fid>` | Print one typed finding with evidence and recommendation. Exit 2 when the fid does not exist. |
 | `fix` | `<scan.json> --fid <fid> [--apply]` | Plan a remediation for one finding. Plan-only by default; `--apply` executes it. Exit 2 when the fid does not exist. |
 
-Exit codes for the stage-4 CLI: 0 success, 1 findings present or a failed
+Exit codes of the command line: 0 success, 1 findings present or a failed
 check (where the subcommand expresses one), 2 requested object not found.
 See [cli.md](cli.md) for examples.
 

@@ -1,6 +1,6 @@
 """Tests for skills/agents-doctor/scripts/config.py.
 
-Four contracts per the spec: an empty workspace yields defaults; excludes
+Four contracts: an empty workspace yields defaults; excludes
 suppress paths (status 'suppressed', never 'pass'); thresholds load their
 values; a malformed file warns and falls back to defaults whole. The
 fallback TOML parser (Python 3.9/3.10) is exercised directly so both

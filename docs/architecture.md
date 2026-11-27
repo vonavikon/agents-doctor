@@ -90,7 +90,7 @@ All scanner modules live in `skills/agents-doctor/scripts/`:
 | `secret_scanner.py` | Secret detection and redaction. The only place raw secret values ever exist; everything downstream sees masks and fingerprints. |
 | `enrich.py` | Extra facts the gates need: config parse integrity, heavy dirs outside git, junk classification, harness activity states, SKILL.md frontmatter health. |
 | `gates.py` | Gate engine. `GATE_DEFS` holds the nine gates as declarative definitions; `GATE_POLICY` is the single source of thresholds. Turns facts — including adapter findings — into gates and typed findings. A rule that did not run or does not apply carries a reason code from the glossary. |
-| `report_model.py` | The finding/gate data model (schema 1.0). Validates severity, status, evidence, confidence; separates the severity and status axes. Every finding carries a stable `check_id` (its type); adapter findings add `harness`. |
+| `report_model.py` | The finding/gate data model (schema 1.0). Validates severity, status, evidence, confidence; separates the severity and status axes. Every finding carries a stable `check_id` (its type); adapter findings add `harness`. Report fields change only by addition: new keys such as `check_id` and `harness` join schema 1.0, and an existing key is never renamed or dropped. |
 | `glossary.py` | The plain-language names: nine gates, every finding type, the reason a check did not run. One source for the digest, both reports and `references/glossary.md`. |
 | `summary.py` | The digest of a scan: what the agent reads instead of the scan JSON. Names findings through the glossary, shows each one's place as a path relative to the audited folder, groups a long tail by type, picks where to start. |
 | `report_human.py` | The plain-language report for non-technical readers (English or Russian): the main problem first, every finding with its place and what to do, what can be made better, where to start. |
@@ -146,7 +146,7 @@ the fact layer.
 A gate evaluates rules over facts. When a fact section is missing
 entirely, the rules it feeds yield `unknown`, never `pass`: missing data
 is not evidence of health. A section that is present but empty is data and
-can pass, except where the spec says absence itself matters (configuration
+can pass, except where absence itself matters (configuration
 files, secret prevention): there the gate warns, because absence of
 evidence must not read as a pass. A gate's status is the worst status
 among its rules; a finding with no evidence can only be `unknown` (enforced

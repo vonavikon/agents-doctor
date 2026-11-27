@@ -1,8 +1,7 @@
 """Security regression suite for the agents-doctor scanner.
 
 Runs skills/agents-doctor/scripts/audit_scan.py end to end against a
-planted fixture workspace and checks four properties from the
-production-readiness spec:
+planted fixture workspace and checks four properties:
 
 A. raw planted secrets never appear in any output artifact
    (scan.json, stdout, stderr); evidence stays redacted;
@@ -23,12 +22,10 @@ F. the limits of the key check are narrow and are said: a copy of the
    folder that cannot be listed does not stop the audit, and a line of
    the user's file does not enter the record.
 
-The suite encodes the post-integration contract for secret evidence
-(dict entries with file/line/kind/commit fields and a redacted value,
-plus a skipped_symlinks_outside counter in stats).  Against the current
-scanner some tests fail on purpose; that red phase documents exactly
-what the integration has to fix.  Do not weaken the assertions to force
-a green run.
+The suite pins the contract for secret evidence (dict entries with
+file/line/kind/commit fields and a redacted value, plus a
+skipped_symlinks_outside counter in stats).  Do not weaken the
+assertions to force a green run.
 """
 
 import hashlib

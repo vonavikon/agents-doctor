@@ -1,4 +1,4 @@
-"""Integration tests for the harness-registry stage (Phase 1/2): the
+"""Integration tests for the harness-registry stage: the
 scan pipeline must carry detection records, adapter findings and
 instruction conflicts into the report and the nine gates."""
 import json

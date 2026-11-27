@@ -1,4 +1,4 @@
-"""audit --fail-on: the CI gate flag (TZ v2.1.0 CI/CD integration).
+"""audit --fail-on: the CI gate flag.
 
 The flag turns a finished audit into a CI gate: after the report is on
 disk, exit 1 when at least one finding has status fail and severity at

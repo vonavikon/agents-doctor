@@ -1,4 +1,4 @@
-"""Focus Engine tests for agents_doctor.py --focus (hardening P0.3).
+"""Focus Engine tests for agents_doctor.py --focus.
 
 Pins the focus engine to the canonical gate mapping documented in
 commands/agents-doctor.md:

@@ -169,9 +169,9 @@ def _generic_scan(lines):
 def _redundancy(signal_lines):
     """Near-duplicate rules. Exact repeats (similarity 1.0) come first, then
     pairs of unique forms with high word overlap. Overlap is the larger of
-    Jaccard and |A and B| / min(|A|, |B|): the spec's own example pair scores
-    0.57 on plain Jaccard but 0.80 on the overlap coefficient, so either
-    measure crossing the threshold marks the pair redundant.
+    Jaccard and |A and B| / min(|A|, |B|): a pair of near-duplicate rules
+    can score 0.57 on plain Jaccard but 0.80 on the overlap coefficient,
+    so either measure crossing the threshold marks the pair redundant.
     Returns (capped list, total count)."""
     forms = {}
     order = []

@@ -1,4 +1,4 @@
-"""Conformance runner (TZ 3.0 section 5): run one adapter against a
+"""Conformance runner: run one adapter against a
 fixture workspace and compare the adapter's answers with the
 expectations the fixture declares.
 

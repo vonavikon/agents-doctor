@@ -380,7 +380,7 @@ def execute(plan, root, assume_yes=False, confirm=None):
     must be exactly 'YES'; assume_yes skips the prompt and exists for
     automation and tests only), then every item under its own try/except
     with the containment and NEVER checks re-run right before it, plus
-    the P0.1 pre-operation gate trashops._pre_operation_check and the
+    the pre-operation gate trashops._pre_operation_check and the
     TOCTOU re-stat: an item whose size, mtime_ns or type changed since
     build_plan, or whose path chain carries a symlink, is aborted (as
     'changed' / 'symlink' / 'escape') and the disk is left alone for
@@ -442,10 +442,10 @@ def execute(plan, root, assume_yes=False, confirm=None):
             summary['skipped_safety'].append({'path': rel, 'reason': 'missing'})
             counts['skipped'] += 1
             continue
-        # P0.1 gate: containment + symlink-free chain + snapshot match,
-        # immediately before the mutation (the user confirmed already);
-        # the symlink walk runs first so a swapped parent or target is
-        # reported as 'symlink', not as ordinary drift
+        # pre-operation gate: containment + symlink-free chain + snapshot
+        # match, immediately before the mutation (the user confirmed
+        # already); the symlink walk runs first so a swapped parent or
+        # target is reported as 'symlink', not as ordinary drift
         ok, reason = trashops._pre_operation_check(
             root, target, it.get('stat'),
             expected_type=('dir' if it.get('action') == 'rmdir' else None))

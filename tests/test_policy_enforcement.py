@@ -1,6 +1,6 @@
 """Enforcement v2 tests: policies.py + the policy/audit CLI contract.
 
-Covers the TZ 3.0 section 3 behaviour: version 2 policy files with an
+Covers the enforcement behaviour: version 2 policy files with an
 enforcement block turn policy violations into CI exit codes.
 
 - back-compat pins: version 1 files and enforcement disabled always
@@ -255,7 +255,7 @@ class UnknownActionTests(EnforcementCase):
 
     def test_exit_four_blocking_rules_lists_unknown_rules(self):
         pol = self.policy(_v2_policy('  required_skills:\n'
-                                     '    - gramax\n',
+                                     '    - notes\n',
                                      unknown_action='block'))
         # skills.entries is empty -> required_skills is unknown
         enf = self.enforcement(self.scan(), pol)
@@ -453,7 +453,7 @@ class HarnessVersionsTests(EnforcementCase):
 # --- required_skills domain -------------------------------------------------------
 
 class RequiredSkillsTests(EnforcementCase):
-    POLICY = _v2_policy('  required_skills:\n    - gramax\n    - nmt\n')
+    POLICY = _v2_policy('  required_skills:\n    - notes\n    - review\n')
 
     def _skills(self, *names):
         return {'entries': [{'name': n, 'path': 'x', 'location': 'l',
@@ -462,19 +462,19 @@ class RequiredSkillsTests(EnforcementCase):
                 'duplicates': [], 'locations_checked': ['l']}
 
     def test_all_skills_present_pass(self):
-        rep = self.scan(skills=self._skills('gramax', 'nmt', 'extra'))
+        rep = self.scan(skills=self._skills('notes', 'review', 'extra'))
         report = self.evaluate(rep, self.policy(self.POLICY))
         rule = [r for r in report['rules_evaluated']
                 if r['id'] == 'POL-REQUIRED-SKILLS'][0]
         self.assertEqual(rule['status'], 'pass')
 
     def test_missing_skill_violates(self):
-        rep = self.scan(skills=self._skills('gramax'))
+        rep = self.scan(skills=self._skills('notes'))
         report = self.evaluate(rep, self.policy(self.POLICY))
         viols = [v for v in report['violations']
                  if v['id'] == 'POL-REQUIRED-SKILLS']
         self.assertEqual(len(viols), 1)
-        self.assertEqual(viols[0]['evidence'][0]['skill'], 'nmt')
+        self.assertEqual(viols[0]['evidence'][0]['skill'], 'review')
 
     def test_empty_entries_is_unknown(self):
         rep = self.scan(skills=self._skills())
@@ -608,7 +608,7 @@ class FallbackParserV2Tests(EnforcementCase):
         '    block_above: high\n'
         '  harness_versions:\n    required:\n'
         '      claude_code: ">=2.1"\n      codex: "<2"\n'
-        '  required_skills:\n    - gramax\n',
+        '  required_skills:\n    - notes\n',
         default_action='warn', unknown_action='warn')
 
     def test_fallback_parser_matches_pyyaml_on_v2_format(self):

@@ -1,4 +1,4 @@
-"""Local web UI for agents-doctor (Visual TZ, Phase V1+).
+"""Local web UI for agents-doctor.
 
 Serves the diagnostics of an existing scan.json (or a fresh in-process
 scan) on 127.0.0.1. Local-first: no external requests, no telemetry;

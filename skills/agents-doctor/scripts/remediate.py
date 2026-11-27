@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guarded remediation engine for agents-doctor (production-readiness stage 5).
+"""Guarded remediation engine for agents-doctor.
 
 Turns one typed finding from a scan.json into a plan of small, reversible
 steps and executes the plan only after explicit confirmation. Supported
@@ -54,22 +54,22 @@ changed}, the same diff the scanner's --baseline computes plus a CHANGED
 section (same section+path, different fingerprint), and reaudit() for
 the before/after report.
 
-Harness-aware fixes (ТЗ 13.3): findings raised by harness adapters
-carry a stable check_id; CHECK_ID_FIXES maps the supported ones to a
-plan. CLAUDE_LOCAL_DEPRECATED moves the file into the trash run
+Harness-aware fixes: findings raised by harness adapters carry a
+stable check_id; CHECK_ID_FIXES maps the supported ones to a plan.
+CLAUDE_LOCAL_DEPRECATED moves the file into the trash run
 (autofix, risk review: the file may hold something worth merging
 first), CURSOR_LEGACY_AND_RULES / WINDSURF_LEGACY_AND_RULES and
 INSTR_DUPLICATION get display-only plans (autofix_available=False,
 nothing executes). A check_id without a registry entry is
 UnsupportedError, like every unsupported finding.
 
-Risk levels (ТЗ 9.3): every step carries risk 'safe' | 'review' |
-'high' | 'manual'. Steps without a risk field are 'safe' (plans from
-older callers keep working). safe steps run after the single global
-'yes'; review and high steps additionally ask per step
-("step N risk=REVIEW: <target> -- apply this step? [yes/no]"; a 'no'
-or EOF skips the step with reason 'declined-risk'); manual steps are
-advice only and never execute (recorded skipped, reason 'manual').
+Risk levels: every step carries risk 'safe' | 'review' | 'high' |
+'manual'. Steps without a risk field are 'safe' (plans from older
+callers keep working). safe steps run after the single global 'yes';
+review and high steps additionally ask per step ("step N risk=REVIEW:
+<target> -- apply this step? [yes/no]"; a 'no' or EOF skips the step
+with reason 'declined-risk'); manual steps are advice only and never
+execute (recorded skipped, reason 'manual').
 New step types: fix_dead_link (manual: the reference is checked or
 removed by hand, the md text is never rewritten automatically),
 normalize_config (review: a JSON file with duplicate keys is rewritten
@@ -80,13 +80,13 @@ which blocks repeat in which files, extract-them-once advice) and
 context_tax_hint (manual: shrink advice for an oversized instruction
 file).
 
-Operation journal (ТЗ 9.4): every apply appends one line to
+Operation journal: every apply appends one line to
 <root>/.agents-doctor/operations.jsonl -- {ts, fid, check_id, root,
 steps: [{action, target, risk, result}]} -- paths and verdicts only,
 never file contents, so no secret can leak into it. Journal failures
 print a warning and never fail the apply.
 
-Concurrency and crash recovery (ТЗ 16): apply_plan runs under the
+Concurrency and crash recovery: apply_plan runs under the
 trash lock (.agents-doctor-trash/.lock, O_EXCL) and refuses cleanly
 with RemediateBusy while another run holds it; trashops.find_incomplete
 / trashops.recover roll back write-ahead entries an interrupted run
@@ -128,7 +128,7 @@ SKIPPED = 'skipped'
 CHANGED = 'changed'
 MANUAL = 'manual'
 
-# --- risk levels (ТЗ 9.3) ---------------------------------------------------------
+# --- risk levels ------------------------------------------------------------------
 
 RISK_SAFE = 'safe'   # runs after the single global confirmation
 RISK_REVIEW = 'review'  # additionally asks per step; the user sees the target
@@ -136,7 +136,7 @@ RISK_HIGH = 'high'   # same per-step gate as review; reserved for riskier fixes
 RISK_MANUAL = 'manual'  # advice only; never executes, recorded skipped
 RISKS = (RISK_SAFE, RISK_REVIEW, RISK_HIGH, RISK_MANUAL)
 
-# operation journal (ТЗ 9.4): <root>/<OPS_DIR_NAME>/<OPS_JOURNAL_NAME>
+# operation journal: <root>/<OPS_DIR_NAME>/<OPS_JOURNAL_NAME>
 OPS_DIR_NAME = '.agents-doctor'
 OPS_JOURNAL_NAME = 'operations.jsonl'
 
@@ -154,12 +154,12 @@ class UnsupportedError(Exception):
     """The finding has no supported automatic fix."""
 
 
-# clean refusal when another trash run holds the lock (ТЗ 16);
+# clean refusal when another trash run holds the lock;
 # trashops.LockBusy under its remediate-facing name
 RemediateBusy = trashops.LockBusy
 
 
-# --- harness check_id registry (ТЗ 13.3) -------------------------------------------
+# --- harness check_id registry -----------------------------------------------------
 
 # Adapter findings carry a stable check_id (harness/adapters/*); the
 # registry maps the ones with a supported fix to a plan builder spec:
@@ -168,7 +168,7 @@ RemediateBusy = trashops.LockBusy
 # but never executed (apply_plan records them as skipped/manual); a
 # 'builder' entry is a function (root, fid, check_id, evidence) ->
 # steps for findings whose steps depend on the evidence. 'risk' is the
-# ТЗ 9.3 level the built steps carry.
+# risk level the built steps carry.
 CHECK_ID_FIXES = {
     'CLAUDE_LOCAL_DEPRECATED': {
         'autofix': True,
@@ -203,7 +203,7 @@ CHECK_ID_FIXES = {
              'follows the migration, not the other way round'),
         ],
     },
-    # instruction blocks duplicated across sources (ТЗ 9.3c): the plan
+    # instruction blocks duplicated across sources: the plan
     # names both files and lines; the extraction into one shared file
     # is a hand edit, never an automatic rewrite
     'INSTR_DUPLICATION': {
@@ -465,7 +465,7 @@ def plan(rep, fid):
             })
         return steps
 
-    # 4) dead references in instruction files (ТЗ 9.3a): one manual
+    # 4) dead references in instruction files: one manual
     # step per reference -- verify the path or remove it by hand; the
     # markdown text is deliberately never rewritten automatically
     if prefix == 'RUL' and re.match(r'^Dead (link|path|command) in ', title):
@@ -503,7 +503,7 @@ def plan(rep, fid):
             })
         return steps
 
-    # 5) oversized instruction file (ТЗ 9.3d): shrink advice, manual
+    # 5) oversized instruction file: shrink advice, manual
     if prefix == 'RUL' and title.startswith('Instruction file over'):
         steps = []
         for ev in evidence:
@@ -530,7 +530,7 @@ def plan(rep, fid):
             })
         return steps
 
-    # 6) duplicate keys in a JSON config (ТЗ 9.3b): the plan shows the
+    # 6) duplicate keys in a JSON config: the plan shows the
     # duplicates; the rewrite is one review-gated step -- first
     # occurrence wins, key order kept, indent 2, original backed up in
     # the trash run
@@ -595,8 +595,7 @@ def _trash_step(root, target, note, risk=RISK_SAFE):
 
 
 def _plan_instr_duplication(root, fid, check_id, evidence):
-    """dedupe_instructions steps for an INSTR_DUPLICATION finding
-    (ТЗ 9.3c).
+    """dedupe_instructions steps for an INSTR_DUPLICATION finding.
 
     The adapter evidence carries both sides of the duplicated block:
     [{'file': a, 'line': la, 'detail': text}, {'file': b, 'line': lb,
@@ -645,8 +644,8 @@ def _plan_check_id(root, fid, check_id, evidence):
 
     The target comes from evidence[0] ('file', as the adapters write
     it; 'path' accepted too), absolute or root-relative. Registered
-    autofix entries build a trash_move step (risk from the spec, ТЗ
-    9.3); manual entries build display-only steps with
+    autofix entries build a trash_move step (the risk comes from the
+    registry entry); manual entries build display-only steps with
     autofix_available=False that apply_plan records as skipped
     (nothing executes); a spec with a 'builder' plans straight from
     the evidence. A target that is already gone since the scan plans
@@ -708,7 +707,7 @@ def print_plan(fid, steps):
 
 # --- execution -----------------------------------------------------------------
 
-# manual-risk action types (ТЗ 9.3): never dispatched even when a
+# manual-risk action types: never dispatched even when a
 # legacy caller hands them to _execute_step directly
 MANUAL_ACTIONS = ('manual', 'fix_dead_link', 'dedupe_instructions',
                   'context_tax_hint')
@@ -722,7 +721,7 @@ def _execute_step(step, root, get_run):
     journaled in that run's write-ahead manifest, so the whole plan is
     one undoable unit.
 
-    P0.1: every mutating action runs trashops._pre_operation_check
+    Every mutating action runs trashops._pre_operation_check
     immediately before it touches the disk (after the user confirmed):
     canonical containment under root, no symlink anywhere in the
     literal path chain, expected type and the plan-time snapshot must
@@ -735,8 +734,8 @@ def _execute_step(step, root, get_run):
     if action in MANUAL_ACTIONS or step_risk(step) == RISK_MANUAL:
         return MANUAL       # advice only; apply_plan records it skipped
     if action in ('rmdir', 'trash_move'):
-        # P0.1 gate: the symlink walk runs first, so a swapped link is
-        # diagnosed as an attack, not as ordinary drift; then
+        # pre-operation gate: the symlink walk runs first, so a swapped
+        # link is diagnosed as an attack, not as ordinary drift; then
         # containment; then the snapshot comparison
         ok, reason = trashops._pre_operation_check(
             root, target, step.get('snapshot'),
@@ -793,7 +792,7 @@ def _execute_step(step, root, get_run):
                 'result': 'moved', 'moved_to': str(dst),
                 'trash_run': str(run.run_dir), 'opid': run.opid}
     if action == 'normalize_config':
-        # ТЗ 9.3b: rewrite a JSON config without duplicate keys. The
+        # rewrite a JSON config without duplicate keys. The
         # mtime/size snapshot from plan time gates the TOCTOU window;
         # a drifted or vanished file is skipped as changed, never
         # rewritten. The original bytes move into the trash run as the
@@ -834,7 +833,7 @@ def _execute_step(step, root, get_run):
 
 
 def _log_operation(root, fid, steps, journal_steps):
-    """Append one operations.jsonl line for an applied plan (ТЗ 9.4).
+    """Append one operations.jsonl line for an applied plan.
 
     The journal records what was attempted -- {ts, fid, check_id, root,
     steps: [{action, target, risk, result}]} -- and nothing else:
@@ -877,34 +876,34 @@ def apply_plan(steps, root, assume_yes=False, reaudit=False, home=None,
     resolved root before anything runs. A failing step is recorded and
     the run continues with the next step; a step whose target changed
     since plan() is skipped as {'reason': 'changed'}; a manual step
-    (risk 'manual', ТЗ 9.3) is recorded as skipped with reason
+    (risk 'manual') is recorded as skipped with reason
     'manual' and never touches the disk. Every mutating step -- trash
     moves, rmdirs, written .gitignore files, config normalizations --
     is journaled in one trash run directory (timestamp + opid) with a
     write-ahead manifest, so the whole plan is undoable in one
     `safe_clean.py restore <run_dir>`.
 
-    Risk levels (ТЗ 9.3): safe steps run after the single global
-    'yes'. review and high steps additionally prompt per step --
+    Risk levels: safe steps run after the single global 'yes'.
+    review and high steps additionally prompt per step --
     'step N risk=REVIEW: <target> -- apply this step? [yes/no]' -- and
     a 'no' or EOF skips that step with reason 'declined-risk' (the
     rest of the plan still runs). manual steps never execute. Steps
     without a risk field are 'safe', so plans from older callers keep
     working.
 
-    Concurrency (ТЗ 16): the first mutating step takes the trash lock
+    Concurrency: the first mutating step takes the trash lock
     (<root>/<TRASH_DIR_NAME>/.lock, O_EXCL); while another run holds
     it apply_plan refuses with RemediateBusy (alias of
     trashops.LockBusy) instead of racing it. The lock is released in a
     finally; a plan whose every step was skipped or manual never takes
     it and never creates the trash directory.
 
-    fid (ТЗ 9.4) rides into the operations journal
+    fid rides into the operations journal
     (<root>/.agents-doctor/operations.jsonl, one line per apply: ts,
     fid, check_id, root, per-step action/target/risk/result -- never
     file contents); journal failures never fail the apply.
 
-    reaudit=True (ТЗ 13.2) re-runs audit_scan.scan(root, home) after a
+    reaudit=True re-runs audit_scan.scan(root, home) after a
     successful apply (home defaults to Path.home(); pass the scan's
     rep['home']) and adds report['reaudit'] = {'before': n, 'after': m}
     -- before from the before_findings list (e.g. rep['findings']),
@@ -976,7 +975,7 @@ def apply_plan(steps, root, assume_yes=False, reaudit=False, home=None,
 
     def get_run():
         if state['run'] is None:
-            # ТЗ 16: take the trash lock before the run directory is
+            # take the trash lock before the run directory is
             # created; LockBusy escapes as RemediateBusy (the alias)
             lock = trashops.TrashLock(root)
             lock.acquire()
@@ -996,7 +995,7 @@ def apply_plan(steps, root, assume_yes=False, reaudit=False, home=None,
     try:
         for num, st in enumerate(steps, 1):
             risk = step_risk(st)
-            # ТЗ 9.3: manual steps never execute; review/high steps
+            # manual steps never execute; review/high steps
             # need their own yes (EOF or a refusal skips the step)
             if risk == RISK_MANUAL:
                 report['skipped'].append({'action': st.get('action'),

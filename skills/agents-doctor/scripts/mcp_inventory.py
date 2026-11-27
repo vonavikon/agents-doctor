@@ -1,4 +1,4 @@
-"""MCP configuration inventory (TZ v2.1.0, module: MCP Security).
+"""MCP configuration inventory.
 
 Collects every MCP server definition the detected harnesses can load,
 through the adapter registry (harness/) — no harness knowledge lives

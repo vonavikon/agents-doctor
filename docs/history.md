@@ -49,8 +49,7 @@ scanner's "fingerprinted findings" line); the severity counts come from
 the typed population — the two are different views of the same report,
 so a small workspace can show `total 0` with nonzero severity counts.
 
-`section` and `path` are not part of the original column list of the
-spec but must be stored: `diff_scans` reuses
+`section` and `path` are stored as well: `diff_scans` reuses
 `remediate.fingerprint_diff`, whose CHANGED detection needs
 section+path next to the fingerprint.
 

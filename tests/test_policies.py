@@ -1,6 +1,6 @@
 """Tests for skills/agents-doctor/scripts/policies.py.
 
-Covers the TZ v2.1.0 policy engine contract: the fallback YAML parser
+Covers the policy engine contract: the fallback YAML parser
 (no PyYAML) against the target format and against broken input, every
 domain positive and negative, the severity mapping, custom rules,
 exceptions with and without a reason, file layering with a severity

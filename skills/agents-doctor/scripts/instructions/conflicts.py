@@ -1,4 +1,4 @@
-"""Deterministic instruction-conflict detection (TZ 6.3, TZ 8).
+"""Deterministic instruction-conflict detection.
 
 Three conflict kinds, all evidence-backed and deterministic; the LLM
 layer may add semantic analysis on top, never replace this:
@@ -12,8 +12,8 @@ layer may add semantic analysis on top, never replace this:
   or more sources (context bloat, drift risk).
 - divergence: a contradiction whose sources belong to different
   harnesses. Reported as divergence (warn): differences between
-  harnesses may be intentional — TZ section 8 forbids reading them as
-  errors automatically.
+  harnesses may be intentional and are never read as errors
+  automatically.
 """
 from __future__ import annotations
 

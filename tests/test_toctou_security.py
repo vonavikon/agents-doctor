@@ -1,4 +1,4 @@
-"""P0.1 TOCTOU security suite: attacks between plan and execute.
+"""TOCTOU security suite: attacks between plan and execute.
 
 The remediation flow is plan -> user confirms -> execute. These tests
 plant the classic time-of-check/time-of-use attacks in that window:

@@ -1,4 +1,4 @@
-"""Continuous monitoring (TZ v2.1 module 1): watch the workspace
+"""Continuous monitoring: watch the workspace
 configuration and re-audit when it changes.
 
 Design (offline-first, no new dependencies):

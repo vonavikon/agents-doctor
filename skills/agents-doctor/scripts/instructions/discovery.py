@@ -1,4 +1,4 @@
-"""Instruction discovery across harnesses (TZ 6.1).
+"""Instruction discovery across harnesses.
 
 Collects every source the registered adapters declare, reads the text
 when needed (size-capped), and keeps the harness attribution: one file

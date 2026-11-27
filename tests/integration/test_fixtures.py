@@ -1,4 +1,4 @@
-"""Integration tests for the agents-doctor scanner (spec section 8.2).
+"""Integration tests for the agents-doctor scanner.
 
 Runs skills/agents-doctor/scripts/audit_scan.py end to end against the
 fixture workspaces built by fixtures.py and asserts the report contract

@@ -172,7 +172,7 @@ class OpencodeAdapter(HarnessAdapter):
         'modelled from the docs, not runtime-verified',
     ]
 
-    # --- conformance: how we know each capability (TZ 3.0 section 5).
+    # --- conformance: how we know each capability.
     # No runtime verification exists for this adapter, so 'runtime-tested'
     # never appears; every entry cites where the knowledge comes from.
     CAPABILITY_STATUS = {

@@ -1,7 +1,6 @@
-"""Conformance framework tests (TZ 3.0 section 5):
-harness/conformance runner + capability matrix, and the zcode fixture
-as the reference example. Everything runs on temp directories via
-pathlib; stdlib only."""
+"""Conformance framework tests: harness/conformance runner + capability
+matrix, and the zcode fixture as the reference example. Everything runs
+on temp directories via pathlib; stdlib only."""
 import inspect
 import json
 import subprocess

@@ -1,4 +1,4 @@
-"""Local web UI server (Visual TZ section 2, Phase V1+).
+"""Local web UI server.
 
     python skills/agents-doctor/scripts/ui/server.py --scan scan.json
     python .../ui/server.py --root <workspace>   # runs a fresh scan
@@ -6,7 +6,7 @@
 Serves a single-page app from ui/static plus a JSON API over one
 scan.json. Binds 127.0.0.1 only; no requests leave the machine.
 
-Safety rules (Visual TZ section 16):
+Safety rules:
 - every file path is resolved and contained under the audited root
   before anything is opened (symlinks resolved first);
 - file previews are size-capped and secret-masked: lines matching a
@@ -15,8 +15,8 @@ Safety rules (Visual TZ section 16):
 - read-only: no endpoint writes, moves or executes anything. The
   remediation preview endpoint plans fixes but never applies them.
 
-Request security (TZ v2.1.0, Local UI Security; threat model: hostile
-pages open in other tabs of the local browser):
+Request security (threat model: hostile pages open in other tabs of the
+local browser):
 - DNS-rebinding defense: every request must carry Host 127.0.0.1[:port]
   or localhost[:port] (exact port when present), else 403 + log;
 - CSRF defense on the mutating endpoint (POST /api/rescan): browsers
@@ -33,10 +33,9 @@ API (all GET unless noted, JSON):
   /api/findings                      ?severity= &gate= &status= &harness= &q=
   /api/finding/<fid>                 one finding in full
   /api/tree                          ?path= &cursor= &sort= &sev=
-                                     paged children + counts (TZ 3.0 6.2)
+                                     paged children + counts
   /api/tree/stats                    ?path=<rel>  recursive size
-                                     accounting with a fingerprint
-                                     cache (TZ 3.0 6.3)
+                                     accounting with a fingerprint cache
   /api/search                        ?q= &limit=  name search over the
                                      whole workspace, not just loaded tree
   /api/file                          ?path=<rel>  masked text preview
@@ -44,7 +43,7 @@ API (all GET unless noted, JSON):
   /api/fixplan                       ?fid=<id> remediation plan (dry)
   /api/mcp                           MCP server inventory (secret-free)
   /api/rescan              (POST)    rerun the scan in-process
-  /api/score                         Workspace Health Score (TZ 3.0 10.3)
+  /api/score                         Workspace Health Score
   /api/history             ?root=    last N recorded scans + regressions
                                      of the newest one (audit_history db)
   /api/trend               ?root=    one point per scan, oldest first
@@ -78,7 +77,7 @@ import secret_rules        # noqa: E402  (preview masking)
 import remediate           # noqa: E402  (dry-run plans only)
 
 MAX_PREVIEW_BYTES = 256 * 1024
-TREE_PAGE = 500            # /api/tree page size (TZ 3.0 6.2)
+TREE_PAGE = 500            # /api/tree page size
 SEARCH_SCAN_CAP = 100_000  # max entries visited by one /api/search
 SEARCH_LIMIT_DEFAULT = 100
 SEARCH_LIMIT_MAX = 500
@@ -87,13 +86,12 @@ TREE_SORTS = ('name', 'size', 'problems')
 HISTORY_LIMIT_DEFAULT = 50   # /api/history scans per page
 HISTORY_LIMIT_MAX = 500
 
-# Workspace Health Score (TZ 3.0 section 10.3). Component groups over
-# the audit gates; the weight of every component is a code constant on
-# purpose. The TZ asks for configurable weights, but a read-only local
-# UI has no honest place to configure them from (a settings panel would
-# invite score tuning until the number looks good). Constants keep every
-# score reproducible; configurability is future CLI work (a flag that
-# bakes the weights into the scan report), not a UI knob.
+# Workspace Health Score. Component groups over the audit gates; the
+# weight of every component is a code constant on purpose: a read-only
+# local UI has no honest place to configure them from (a settings panel
+# would invite score tuning until the number looks good). Constants keep
+# every score reproducible; configurability is future CLI work (a flag
+# that bakes the weights into the scan report), not a UI knob.
 SCORE_COMPONENTS = (
     ('security', 0.30, ('G6', 'G7')),
     ('config', 0.20, ('G2',)),
@@ -120,7 +118,7 @@ class UiState:
         self._counts = _per_file_counts(report)
         # rel-path -> (fingerprint, stats response) for /api/tree/stats;
         # cleared on every reload (POST /api/rescan) because findings
-        # and the tree both change underneath (TZ 3.0 6.3)
+        # and the tree both change underneath
         self._stats_cache = {}
 
     def reload(self, report: dict, baseline: dict | None = None):
@@ -279,8 +277,8 @@ def api_finding(state: UiState, fid: str):
 
 
 def _tree_child(state: UiState, entry) -> dict:
-    """One child record for /api/tree: same keys as before the TZ 3.0
-    pagination change (name/path/is_dir/symlink/size/mtime/counts).
+    """One child record for /api/tree: name/path/is_dir/symlink/size/
+    mtime/counts, the keys the API had before pagination was added.
     counts come from the full findings map, never from a page."""
     relpath = Path(entry.path).relative_to(state.root).as_posix()
     try:
@@ -310,7 +308,7 @@ def _tree_child(state: UiState, entry) -> dict:
 
 
 def api_tree(state: UiState, qs):
-    """Lazy directory children, paginated (TZ 3.0 section 6.2).
+    """Lazy directory children, paginated.
 
     ?path=<rel> &cursor=<int offset> &sort=name|size|problems
     &sev=<csv severity filter>. Returns children (one page of
@@ -381,10 +379,10 @@ def api_tree(state: UiState, qs):
     }
 
 
-# ------------------------------------------------- /api/tree/stats (6.3)
+# ------------------------------------------------- /api/tree/stats
 
 def _stats_walk(start: Path, root: Path, build_root: bool = False) -> dict:
-    """Recursive size accounting with os.scandir (TZ 3.0 6.3).
+    """Recursive size accounting with os.scandir.
 
     Symlinks are skipped entirely (not followed, not counted: no
     double counting, no cycles). Inaccessible directories are
@@ -454,7 +452,7 @@ def _problem_files_bytes(state: UiState, rel_key: str) -> int:
 
 
 def api_tree_stats(state: UiState, qs):
-    """Exact recursive sizes for one directory (TZ 3.0 section 6.3).
+    """Exact recursive sizes for one directory.
 
     Cached in UiState._stats_cache keyed by rel path; every request
     re-probes the directory fingerprint (max mtime, nfiles, nentries)
@@ -505,10 +503,10 @@ def api_tree_stats(state: UiState, qs):
     return result
 
 
-# ---------------------------------------------------- /api/search (6.2)
+# ---------------------------------------------------- /api/search
 
 def api_search(state: UiState, qs):
-    """Server-side name search over the whole workspace (TZ 3.0 6.2):
+    """Server-side name search over the whole workspace:
     the frontend is no longer limited to the loaded tree. Substring
     match on entry names, casefolded both ways; directories get
     prefix-aggregated counts like _dir_counts. The walk is capped at
@@ -669,7 +667,7 @@ def api_mcp(state: UiState, _qs):
         return {'error': 'mcp inventory failed: %s' % exc}
 
 
-# ------------------------------------- governance dashboard (TZ 3.0 section 10)
+# --------------------------------------------------- governance dashboard
 
 def _gate_critical_map(report: dict) -> dict:
     """gid -> True when that gate has at least one fail finding of
@@ -683,7 +681,7 @@ def _gate_critical_map(report: dict) -> dict:
 
 
 def compute_health_score(report: dict, history_available: bool) -> dict:
-    """Workspace Health Score (TZ 3.0 10.3): deterministic, explainable.
+    """Workspace Health Score: deterministic, explainable.
 
     Per component: start at 100; -30 for every gate of the group that
     fails WITH critical findings, -15 for a fail without them, -5 per
@@ -782,8 +780,8 @@ def api_score(state: UiState, _qs):
 
 def api_history(state: UiState, qs):
     """Last N recorded scans (newest first) plus the regressions of the
-    newest scan (TZ 3.0 section 10). No history database yet ->
-    available: False with empty lists, never an error."""
+    newest scan. No history database yet -> available: False with
+    empty lists, never an error."""
     raw_limit = qs.get('limit', [''])[0]
     if raw_limit in ('', None):
         limit = HISTORY_LIMIT_DEFAULT

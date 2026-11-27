@@ -1,10 +1,10 @@
-"""Harness registry (Phase 1).
+"""Harness registry.
 
 Single place that knows which adapters exist. Replaces the four
-hand-synced harness lists found by the Phase 0 audit (HARNESS dict in
-audit_scan.py, project_dirs, HARNESS_DIRS in enrich.py, _DIR_TO_TOOL in
-gates.py). Adapters self-register on import; importing this package
-imports all adapter modules.
+hand-synced harness lists (HARNESS dict in audit_scan.py, project_dirs,
+HARNESS_DIRS in enrich.py, _DIR_TO_TOOL in gates.py). Adapters
+self-register on import; importing this package imports all adapter
+modules.
 """
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ def iter_adapters() -> list:
 
 def spec_matrix() -> list:
     """Spec provenance for every registered adapter (Harness Support
-    Matrix, TZ 2.3/3.8)."""
+    Matrix)."""
     return [a.spec_info() for a in iter_adapters()]
 
 

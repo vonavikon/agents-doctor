@@ -1,6 +1,6 @@
-"""Stage-5 v3 remediation tests (ТЗ 3.0 section 9): per-step risk
-levels, the new action types (fix_dead_link, normalize_config,
-dedupe_instructions, context_tax_hint) and the operations journal.
+"""Remediation tests: per-step risk levels, the action types
+(fix_dead_link, normalize_config, dedupe_instructions, context_tax_hint)
+and the operations journal.
 
 Fixtures follow the two established conventions:
 
@@ -495,7 +495,7 @@ class NormalizeConfig(RemediationV3Case):
             remediate.plan(rep, self.fid_for(rep, 'Duplicate key')), [])
 
 
-# --- operations journal (ТЗ 9.4) -------------------------------------------------------
+# --- operations journal ----------------------------------------------------------------
 
 class OperationsJournal(RemediationV3Case):
     def junk_steps(self):

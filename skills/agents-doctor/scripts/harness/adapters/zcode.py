@@ -1,5 +1,5 @@
 """Z Code adapter. Mirrors the behaviour that audit_scan.py hardcoded
-before Phase 1 (HARNESS dict entry), now as the single source:
+in its HARNESS dict entry; now the single source:
 
 - home state dir   ~/.zcode (activity markers: cli/history.jsonl,
                     projects, config)
@@ -34,7 +34,7 @@ class ZcodeAdapter(HarnessAdapter):
     known_limitations = [
         'nested AGENTS.md merging not modelled; only user + project root',
     ]
-    # --- conformance statuses (TZ 3.0 section 5). This dict is the
+    # --- conformance statuses. This dict is the
     # reference pattern for other adapters: every line names its
     # capability, its status and WHY — a status without a reason here
     # is unreviewable. Absent keys read as 'unknown' downstream.

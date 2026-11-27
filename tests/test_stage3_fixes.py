@@ -1,4 +1,4 @@
-"""Stage-3 regression tests: product bugs found by the integration suite.
+"""Regression tests: product bugs found by the integration suite.
 
 Each test pins one end-to-end defect the scenario suite surfaced:
 - skills_frontmatter keys malformed-skill records by path (no name parses);

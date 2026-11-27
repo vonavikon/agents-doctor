@@ -1,5 +1,4 @@
-"""Browser E2E tests for the agents-doctor local web UI (Visual TZ
-section 7, stages 1 and 4).
+"""Browser E2E tests for the agents-doctor local web UI.
 
 Playwright sync API on top of unittest (the repo runs unittest, not
 pytest). Each test class builds a temp workspace, scans it in-process,
@@ -57,8 +56,8 @@ CANARY_TAIL = 'abcdefghijklmnopqrstuv'
 
 WAIT_MS = 15000  # explicit per-wait budget, well under unittest's wants
 
-# Playwright browser channel (TZ 3.0 section 7, stage 4: chromium in
-# the default run, firefox in the second CI step). Unknown names fail
+# Playwright browser channel: chromium in
+# the default run, firefox in the second CI step. Unknown names fail
 # loudly; a known name without its binary skips honestly.
 E2E_BROWSER = os.environ.get('AGENTS_E2E_BROWSER', 'chromium').strip().lower()
 
@@ -155,7 +154,7 @@ class UiHarness:
 
 @unittest.skipUnless(PLAYWRIGHT, 'playwright not installed')
 class MainWorkspaceE2ETest(unittest.TestCase):
-    """Stage-1 scenarios over the fixture workspace: layout, overview,
+    """Scenarios over the fixture workspace: layout, overview,
     chips, findings + card, tree + inspector (masking!), simulate,
     compare, rescan, dead-file handling, request security."""
 
@@ -208,10 +207,10 @@ class MainWorkspaceE2ETest(unittest.TestCase):
         # topbar meta shows the audited root path
         root_txt = pg.inner_text('#meta-root')
         self.assertIn(self.harness.root.name, root_txt)
-        # the seven stage-1 tabs must be present. Presence, not an
-        # exact count: later stages add tabs of their own (the History
-        # tab of the governance dashboard), and this test must not
-        # break every time one lands.
+        # the seven original tabs must be present. Presence, not an
+        # exact count: the UI has more tabs than these seven (the
+        # History tab of the governance dashboard), and this test must
+        # not break every time a new one lands.
         for tab in ('overview', 'tree', 'treemap', 'instructions',
                     'findings', 'simulate', 'compare'):
             self.assertEqual(
@@ -474,7 +473,7 @@ class EmptyWorkspaceE2ETest(unittest.TestCase):
 
 @unittest.skipUnless(PLAYWRIGHT, 'playwright not installed')
 class TreeMapNavigationE2ETest(unittest.TestCase):
-    """Stage-1 TreeMap fix (TZ 3.0 section 4): selection stays in the
+    """TreeMap fix: selection stays in the
     TreeMap, double click zooms, keyboard drives the same actions."""
 
     @classmethod
@@ -590,7 +589,7 @@ class TreeMapNavigationE2ETest(unittest.TestCase):
 
 @unittest.skipUnless(PLAYWRIGHT, 'playwright not installed')
 class UserJourneyE2ETest(unittest.TestCase):
-    """TZ 3.0 section 7.2, stage 4: the full analyst path as ONE test.
+    """The full analyst path as ONE test.
     A journey is stateful by definition — the selection, open inspector
     and fetched findings of step N are the starting point of step N+1,
     so splitting it would test something else entirely.
@@ -783,7 +782,7 @@ def _locked_workspace(root: Path) -> None:
 
 @unittest.skipUnless(PLAYWRIGHT, 'playwright not installed')
 class ErrorPathsE2ETest(unittest.TestCase):
-    """TZ 3.0 section 7, stage 4: error and edge scenarios. Each test
+    """Error and edge scenarios. Each test
     builds its own harness (most need a bespoke server state) and each
     ends with the console gate. The empty workspace and the dead file
     after scan live in MainWorkspaceE2ETest already; not duplicated."""

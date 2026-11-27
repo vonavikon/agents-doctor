@@ -1,4 +1,4 @@
-"""Tests for the Governance Dashboard API (TZ 3.0 section 10):
+"""Tests for the Governance Dashboard API:
 Workspace Health Score (/api/score) and the audit-history endpoints
 (/api/history, /api/trend, /api/diff) over the root-local
 agents-doctor history database.

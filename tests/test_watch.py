@@ -1,4 +1,4 @@
-"""Tests for the watch module (TZ v2.1 module 1): change detection,
+"""Tests for the watch module: change detection,
 once-mode state semantics, daemon caps, history isolation."""
 import sys
 import tempfile

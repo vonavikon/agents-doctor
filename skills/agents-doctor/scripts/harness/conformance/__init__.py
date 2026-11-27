@@ -1,9 +1,9 @@
-"""Conformance framework (TZ 3.0 section 5): fixtures that pin each
-adapter's behaviour, and the capability matrix generated from the
-registry. See runner.py for the fixture contract and matrix.py for
-the JSON matrix and its staleness gate. matrix is deliberately NOT
-imported here so that `python -m harness.conformance.matrix` runs
-without the package-init double-import warning."""
+"""Conformance framework: fixtures that pin each adapter's behaviour,
+and the capability matrix generated from the registry. See runner.py
+for the fixture contract and matrix.py for the JSON matrix and its
+staleness gate. matrix is deliberately NOT imported here so that
+`python -m harness.conformance.matrix` runs without the package-init
+double-import warning."""
 from __future__ import annotations
 
 from .runner import (CHECK_NAMES, discover_fixtures, fixture_path,

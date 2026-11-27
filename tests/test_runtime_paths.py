@@ -1,4 +1,4 @@
-"""Stage-2 smoke: every entry script runs from an unrelated current
+"""Smoke test: every entry script runs from an unrelated current
 directory, against a COPY of the plugin tree (no repo checkout, no path
 inside the audited workspace) — proving launch paths do not depend on
 where the plugin is installed or where the user stands.

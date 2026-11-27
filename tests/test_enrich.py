@@ -1,4 +1,4 @@
-"""Tests for skills/agents-doctor/scripts/enrich.py (fact-enrichment, stage 2).
+"""Tests for skills/agents-doctor/scripts/enrich.py (fact-enrichment).
 
 Covers config parse integrity, heavy dirs outside git, junk classification
 with real git fixtures, harness activity states and SKILL.md frontmatter

@@ -1,4 +1,4 @@
-"""Tests for the scaled tree API (Visual TZ 3.0, sections 6.2-6.3):
+"""Tests for the scaled tree API:
 /api/tree pagination + sorting + severity filter, /api/tree/stats
 recursive size accounting with a fingerprint cache, /api/search
 server-side name search. Contract pinned for the frontend: see the
@@ -80,7 +80,7 @@ def _symlinks_supported():
 
 
 class TreePaginationTest(unittest.TestCase):
-    """TZ 3.0 6.2: cursor pages, next_cursor, total/returned/complete,
+    """Cursor pages, next_cursor, total/returned/complete,
     and backward compatibility of the old keys."""
 
     def setUp(self):

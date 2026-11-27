@@ -1,5 +1,5 @@
-"""Capability matrix (TZ 3.0 section 5.4): the per-harness capability
-statuses, as JSON, generated from the live adapter registry.
+"""Capability matrix: the per-harness capability statuses, as JSON,
+generated from the live adapter registry.
 
 docs/capability-matrix.json is generated, never hand-edited — the
 same rule as docs/HARNESS-MATRIX.md. Each row:

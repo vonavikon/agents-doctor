@@ -1,4 +1,4 @@
-"""External harness adapters (TZ section 17, plugin architecture).
+"""External harness adapters (plugin architecture).
 
 agents-doctor never auto-discovers or auto-runs code: an external
 adapter is loaded only from a path the user explicitly listed in

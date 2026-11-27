@@ -1,19 +1,18 @@
 """Gate engine: turns scanner facts into the nine gates and typed findings.
 
-Input is the rep dict from audit_scan.scan() plus the optional stage-2
-fact sections: config_integrity, heavy_outside_git, junk_classified and
-skills_extra (or the same fields merged into skills.entries). Every
-section is optional: a section that is entirely absent yields unknown
-rules, never a silent pass. A section that is present but empty is data:
-it passes when nothing is wrong, except where the spec says absence
-itself matters (configuration files, secret prevention) -- there it
-warns, because absence of evidence must not read as a pass.
+Input is the rep dict from audit_scan.scan() plus the optional fact
+sections of the enrichment module: config_integrity, heavy_outside_git,
+junk_classified and skills_extra (or the same fields merged into
+skills.entries). Every section is optional: a section that is entirely
+absent yields unknown rules, never a silent pass. A section that is
+present but empty is data: it passes when nothing is wrong, except where
+absence itself matters (configuration files, secret prevention) -- there
+it warns, because absence of evidence must not read as a pass.
 
 Thresholds live in GATE_POLICY so the scanner and the tests import one
 source of truth. This module deliberately does not import audit_scan
 (circular); audit_scan.py keeps its own PROJECT_BENCH / CHAIN_BUDGET /
-SKILL_DESC_LIMIT copies for now and will switch to importing GATE_POLICY
-when the stage-2 integration lands.
+SKILL_DESC_LIMIT copies of three of these values.
 """
 import sys
 from pathlib import Path

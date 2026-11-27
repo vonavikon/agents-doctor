@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Keep README facts generated, not hand-maintained (TZ 3.0 section 12.1).
+"""Keep README facts generated, not hand-maintained.
 
 The README carries a generated line inside a marker block:
 

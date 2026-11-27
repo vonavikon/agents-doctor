@@ -51,7 +51,7 @@ DEFAULTS = {
     'exclude': {'directories': [], 'files': [], 'rules': []},
     'thresholds': {'max_file_mb': 5, 'junk_fail_gb': 0.5},
     'report': {'lang': 'en'},
-    # explicit opt-in external adapters (TZ 17): paths to python
+    # explicit opt-in external adapters: paths to python
     # modules; never auto-discovered
     'plugins': {'adapters': []},
     # policy engine (v2.1): rule-id exceptions with reasons; the

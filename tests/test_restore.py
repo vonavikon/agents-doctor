@@ -1,4 +1,4 @@
-"""Stage-4 tests: restoring a trash run (trashops.restore + the
+"""Tests for restoring a trash run (trashops.restore + the
 `safe_clean.py restore` CLI + the tools/restore.py shim).
 
 Fixture (temp): a small workspace with two junk files. Each test moves

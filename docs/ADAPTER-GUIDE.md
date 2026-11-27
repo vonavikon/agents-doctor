@@ -13,7 +13,7 @@ skills/agents-doctor/scripts/harness/
 ├── __init__.py      the registry — import your module here
 ├── detection.py     multi-harness detection engine
 ├── collect.py       bridge into the scan pipeline (audit_scan)
-├── external.py      opt-in external adapters (TZ section 17)
+├── external.py      opt-in external adapters
 └── adapters/
     └── <name>.py    one environment per module
 ```
@@ -94,7 +94,7 @@ class MyAdapter(HarnessAdapter):
   guess; `spec_verified` is the date of your last documentation check,
   not the release date of the harness.
 - Divergence is not error: differences between harnesses are reported
-  as `divergence` (warn), never fail (TZ section 8).
+  as `divergence` (warn), never fail.
 
 ## External adapters (no repo changes needed)
 

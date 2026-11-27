@@ -31,7 +31,11 @@ and the digest print these reasons in words.
 
 Every finding carries a stable `check_id` (its type, e.g.
 `SEC_EXPOSED_SECRET`, `SKL_FRONTMATTER_INVALID`); the `fid` is only the
-per-scan counter. The plain name of each type is in
+per-scan counter. The prefix of the `fid` names one of eight families,
+`SEC`, `CFG`, `RUL`, `DIR`, `SKL`, `GIT`, `GOV` and `HLTH`: findings from
+harness adapters and from instruction conflicts use the same eight, and
+a family such as `CLAUDE`, `CODEX` or `INSTR` exists only as the start
+of a `check_id`. The plain name of each type is in
 [references/glossary.md](../skills/agents-doctor/references/glossary.md).
 
 Severity (impact when a check does not pass):

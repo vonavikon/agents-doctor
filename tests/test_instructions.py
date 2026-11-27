@@ -1,4 +1,4 @@
-"""Tests for the instructions package (Phase 2): discovery, conflicts,
+"""Tests for the instructions package: discovery, conflicts,
 simulation. Runs against the real zcode adapter plus a throwaway fake
 adapter registered for cross-harness cases."""
 import sys

@@ -65,7 +65,7 @@ RULES = [
     {'id': 'SEC-004', 'kind': 'private-key', 'mask': 'PRIVATE KEY***',
      'confidence': 0.99,
      # [A-Z ]* already covers '-----BEGIN ENCRYPTED PRIVATE KEY-----';
-     # one rule, per spec.
+     # one rule for every block type.
      'py': re.compile(r'-----BEGIN [A-Z ]*PRIVATE KEY-----'),
      'ere': '-----BEGIN [A-Z ]*PRIVATE KEY-----'},
     # --- dedicated rules SEC-1xx, all ordered before generic SEC-005.

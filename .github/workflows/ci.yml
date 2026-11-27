@@ -49,7 +49,7 @@ jobs:
           python -m coverage run -m unittest discover -s tests
           python -m coverage run qa/eval.py
           python -m coverage combine
-      - name: per-module thresholds (spec v0.7.0 section 10)
+      - name: per-module thresholds
         run: |
           python -m coverage report --include='*secret_scanner*'   --fail-under=95
           python -m coverage report --include='*audit_scan*'      --fail-under=90
@@ -83,7 +83,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
-      - name: precision/recall floors (spec section 11.3)
+      - name: precision/recall floors
         run: python bench/secret_quality.py --out bench/SECRET-QUALITY-ci.md
       - uses: actions/upload-artifact@v4
         if: always()
@@ -157,7 +157,7 @@ jobs:
           path: bench/BENCH-*.md
 
   ui-e2e:
-    # browser E2E over the local UI server (Visual TZ section 7).
+    # browser E2E over the local UI server.
     # The playwright suite skips itself everywhere else; only this job
     # installs the browsers, so it is the one place the tests run.
     # Two passes: chromium (default) and firefox via AGENTS_E2E_BROWSER
@@ -197,7 +197,7 @@ jobs:
           root = pathlib.Path('.')
           ver = json.loads((root / '.claude-plugin/plugin.json').read_text())['version']
           out = f'agents-doctor-{ver}.zip'
-          # allowlist: exactly what an installed plugin needs (spec section 11)
+          # allowlist: exactly what an installed plugin needs
           allow = ['.claude-plugin/plugin.json', 'marketplace.json', 'LICENSE',
                    'README.md', 'CHANGELOG.md']
           for pattern in ('commands/*', 'skills/**/*', 'docs/*.md',

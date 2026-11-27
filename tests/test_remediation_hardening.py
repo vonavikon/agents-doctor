@@ -1,4 +1,4 @@
-"""Phase-4 hardening tests: crash recovery, concurrency lock,
+"""Hardening tests: crash recovery, concurrency lock,
 harness check_id fixes, apply-time re-audit and TOCTOU on fix targets.
 
 Crash recovery simulates a process that died between the write-ahead
@@ -443,7 +443,7 @@ class ApplyPlanLocking(HardeningCase):
         self.assertIs(remediate.RemediateBusy, trashops.LockBusy)
 
 
-# --- harness check_id fixes (ТЗ 13.3) --------------------------------------------------
+# --- harness check_id fixes ------------------------------------------------------------
 
 def check_id_rep(ws, check_id, target, fid='GOV-001'):
     """A hand-crafted adapter finding the way gates.evaluate appends
@@ -550,7 +550,7 @@ class CheckIdManual(HardeningCase):
         self.assertIn('no file', str(cm.exception))
 
 
-# --- re-audit after fix (ТЗ 13.2) ------------------------------------------------------
+# --- re-audit after fix ----------------------------------------------------------------
 
 class ApplyPlanReaudit(HardeningCase):
     def setUp(self):

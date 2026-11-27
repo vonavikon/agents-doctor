@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Agent Runtime Health (TZ section 12, Phase 6).
+"""Agent Runtime Health.
 
 Opt-in runtime environment audit: verifies that this machine can run
 the agent harnesses the static audit talks about. STRICTLY opt-in --
@@ -12,7 +12,7 @@ Safety contract:
   contacted, config checks are structure-only);
 - read-only: nothing is written to disk;
 - the only subprocess ever spawned is `<bin> --version` with a 10s
-  timeout, shell=False and a list argv. The TZ 8.2 inventory checks
+  timeout, shell=False and a list argv. The inventory checks
   (skills, plugin cache, MCP commands) are pure filesystem reads:
   RT-MCP-COMMANDS looks command names up on PATH via shutil.which but
   never executes anything, and env VALUES never enter any output -- it

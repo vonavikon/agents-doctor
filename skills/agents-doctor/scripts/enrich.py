@@ -1,4 +1,4 @@
-"""Fact-enrichment module for agents-doctor (production-readiness stage 2).
+"""Fact-enrichment module for agents-doctor.
 
 Collects the extra facts the gate engine needs on top of the scanner report:
 config parse integrity, heavy directories outside any git repo, junk

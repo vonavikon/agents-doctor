@@ -1,6 +1,6 @@
-"""Tests for the local web UI server (Visual TZ section 16):
+"""Tests for the local web UI server:
 API shape, path containment, secret masking in previews, read-only
-guarantees, and the request-security layer of TZ v2.1.0 (Host check,
+guarantees, and the request-security layer (Host check,
 CSRF/Origin check, --token mode, CSP headers)."""
 import http.client
 import json
@@ -153,7 +153,7 @@ class ApiTest(unittest.TestCase):
 
 
 # ------------------------------------------------------------------
-# request-security layer (TZ v2.1.0, Local UI Security): a real server
+# request-security layer: a real server
 # on an ephemeral loopback port, exercised over plain http.client so
 # header spoofing can be tested exactly as the wire sees it.
 

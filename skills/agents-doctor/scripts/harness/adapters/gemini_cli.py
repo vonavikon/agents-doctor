@@ -145,7 +145,7 @@ class GeminiCliAdapter(HarnessAdapter):
         'code blocks are not excluded',
     ]
 
-    # --- conformance (TZ 3.0 section 5): honesty status per capability.
+    # --- conformance: honesty status per capability.
     # No runtime verification exists for this adapter, so
     # 'runtime-tested' never appears: claims trace to the Gemini CLI
     # docs (spec_source) or to a known_limitations entry.

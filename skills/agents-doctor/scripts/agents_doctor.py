@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""agents-doctor command line (production-readiness stage 4).
+"""agents-doctor command line.
 
 Single entry point on top of the scanner: focused audits, baseline
 comparison, finding lookup and guarded fixes. The scanner runs

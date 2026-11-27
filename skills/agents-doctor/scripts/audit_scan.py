@@ -608,7 +608,7 @@ def skills_report(home, root):
 
 
 # --- summary gates ---------------------------------------------------------------
-# Gate evaluation moved to gates.py (stage 2): declarative definitions,
+# Gate evaluation moved to gates.py: declarative definitions,
 # severity/status split, UNKNOWN on missing data. The old inline builder
 # was removed; audit_scan collects facts, gates.evaluate judges them.
 
@@ -1038,7 +1038,7 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
                 pass
 
     rep['harness'] = harness_report(home, root)
-    # recursive, honest harness activity (stage 2): overrides the shallow
+    # recursive, honest harness activity: overrides the shallow
     # top-level mtime heuristic; missing data reads as unknown, not abandoned
     try:
         hs = enrich.harness_states(home)
@@ -1062,7 +1062,7 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
     rep['chain_budget_over'] = any(c['over'] for c in rep['context_budget'])
 
     prof['context'] = time.monotonic() - _tp; _tp = time.monotonic()
-    # --- stage-2 enrichment facts ------------------------------------------------
+    # --- enrichment facts --------------------------------------------------------
     repo_dirs = [str(root / t['name']) for t in rep['top_level']
                  if t.get('kind') == 'repo']
     try:
@@ -1090,7 +1090,7 @@ def scan(root, home, deep=False, history_depth=None, history_all_refs=False,
     except OSError:
         rep['skills_extra'] = {}
 
-    # --- harness registry stage (Phase 1/2): detection over all
+    # --- harness registry stage: detection over all
     # registered adapters, adapter-specific validation, instruction
     # conflicts at the workspace root. Legacy rep['harness'] above stays
     # untouched for back-compat; this block only ADDS sections.

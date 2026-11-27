@@ -90,7 +90,7 @@ class WindsurfAdapter(HarnessAdapter):
         'glob semantics approximated with fnmatch + dir-prefix',
     ]
 
-    # --- conformance: how we know each capability (TZ 3.0 section 5).
+    # --- conformance: how we know each capability.
     # No runtime verification exists for this adapter, so 'runtime-tested'
     # never appears; every entry cites where the knowledge comes from.
     CAPABILITY_STATUS = {

@@ -1,4 +1,4 @@
-"""Multi-harness detection engine (TZ section 4).
+"""Multi-harness detection engine.
 
 Combines three signals per adapter, in weakening order:
 1. project markers — config/instruction files inside the workspace;

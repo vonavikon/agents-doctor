@@ -1,4 +1,4 @@
-"""Fixture builders for the agents-doctor integration suite (spec 8.2).
+"""Fixture builders for the agents-doctor integration suite.
 
 Each builder takes an empty base directory and returns (root, home,
 extra): root is the workspace the scanner audits, home stands in for the

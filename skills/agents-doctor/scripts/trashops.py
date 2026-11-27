@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Shared trash-run machinery for the two file-mutating tools,
-safe_clean.py and remediate.py (production-readiness stage 4).
+safe_clean.py and remediate.py.
 
 Both tools move junk into timestamped run directories under
 <root>/<TRASH_DIR_NAME>/ and record everything they do in a manifest.json
@@ -52,7 +52,7 @@ inside the run directory. The rules implemented here:
 - TOCTOU snapshots: planning code records {size, mtime_ns, type} per
   item via snapshot(); the executor re-stats immediately before each
   operation and aborts the item when unchanged() says the file changed.
-- P0.1 pre-operation gate: every mutating operation calls
+- Pre-operation gate: every mutating operation calls
   _pre_operation_check(root, target, snapshot) immediately before the
   filesystem change (after the user confirmed): canonical containment
   under root, no symlink anywhere in the literal path chain from root
@@ -129,7 +129,7 @@ STATUS_RECOVERY_CONFLICT = 'recovery_conflict'
 
 
 class SecurityRefusal(ValueError):
-    """A _pre_operation_check refused the mutation (P0.1 TOCTOU
+    """A _pre_operation_check refused the mutation (TOCTOU
     defence): the target failed the containment, symlink-chain or
     snapshot verification run immediately before the filesystem
     change. Nothing was touched."""
@@ -186,7 +186,7 @@ def unchanged(snap, cur):
 
 def _pre_operation_check(root, target_path, snapshot=None,
                          expected_type=None, allow_missing=False):
-    """Last-chance TOCTOU gate for every mutating operation (P0.1).
+    """Last-chance TOCTOU gate for every mutating operation.
 
     Runs immediately before the filesystem change and after the user
     confirmed. Verifies, in order:
@@ -356,7 +356,7 @@ class TrashRun:
                        'removed_dirs': 0, 'created': 0, 'freed_bytes': 0},
         }
         self.entries = []
-        # P0.1: the trash chain must be real directories, not symlinks
+        # the trash chain must be real directories, not symlinks
         # planted between confirmation and the first move -- a linked
         # trash folder would route the whole run (manifest included)
         # outside the workspace root
@@ -401,7 +401,7 @@ def move_to_trash(run, src, rel, size, mtime_ns, kind=None):
     is collision-suffixed, never overwritten. Returns (dst, entry_idx).
     Raises whatever the move raised after marking the entry 'failed'.
 
-    P0.1: the destination side is gated right before the move -- the
+    The destination side is gated right before the move -- the
     run directory and every component below it up to the destination
     parent must be real directories under root. A trash chain swapped
     for symlinks after the user confirmed raises SecurityRefusal before
@@ -486,7 +486,7 @@ def record_create_file(run, target, rel, data):
     may be str (written as UTF-8) or bytes. Returns the entry index;
     raises whatever the write raised after marking the entry 'failed'.
 
-    P0.1: the file is created with os.open(O_CREAT|O_EXCL) -- a name
+    The file is created with os.open(O_CREAT|O_EXCL) -- a name
     that appears between the caller's check and this write (or a
     symlink planted there) makes the open fail; an existing file is
     never opened, written through or overwritten."""
@@ -586,7 +586,7 @@ def find_interrupted(root):
     return best_opid
 
 
-# --- concurrency lock (ТЗ 16) -------------------------------------------------------
+# --- concurrency lock ---------------------------------------------------------------
 
 # lock file inside the trash root guarding every mutating run; content
 # is "<pid>\n<started_at ISO>\n"
@@ -731,7 +731,7 @@ def _entry_action(entry):
 def _undo_target(root, orig):
     """Validated absolute destination for undoing original_path: the
     relative shape must be safe, the resolved path must stay under
-    root and out of the trash folder, and (P0.1) the whole literal
+    root and out of the trash folder, and the whole literal
     chain below root must be symlink-free -- a link planted at the
     original spot or anywhere above it refuses the undo. Raises
     ValueError otherwise."""
@@ -766,7 +766,7 @@ def _undo_entry(run_dir, root, entry):
         if not _is_under(src, run_dir) or not _exists(src):
             raise ValueError('trash copy missing or outside the run dir: %s'
                              % trash_rel)
-        # manifest integrity (P0.1): a file entry must still carry the
+        # manifest integrity: a file entry must still carry the
         # size recorded when it was moved; a mismatch means the manifest
         # (or the copy) was tampered with. A recorded size of 0 counts
         # as 'not recorded' -- legacy and hand-built entries.
@@ -853,7 +853,7 @@ def restore(run_dir, root=None, opid=None, assume_yes=False, confirm=None):
     counted as not restorable instead of being undone. Both sides are
     containment-checked: the trash copy must stay under the run dir,
     every undo target under root and reachable through a symlink-free
-    chain (the P0.1 pre-operation gate; a file entry whose size no
+    chain (the pre-operation gate; a file entry whose size no
     longer matches the manifest record is refused as tampered). Each
     undo is itself write-ahead
     ('restoring' before the act), and the entry ends as 'restored'
@@ -945,7 +945,7 @@ def restore(run_dir, root=None, opid=None, assume_yes=False, confirm=None):
     return summary
 
 
-# --- crash recovery (ТЗ 16) --------------------------------------------------------
+# --- crash recovery ----------------------------------------------------------------
 
 def find_incomplete(root):
     """In-flight manifest entries of the most recent interrupted run.

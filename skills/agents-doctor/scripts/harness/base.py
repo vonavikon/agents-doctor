@@ -1,4 +1,4 @@
-"""Harness adapter contract (Phase 1).
+"""Harness adapter contract.
 
 Every supported AI-agent environment (Claude Code, Codex, Cursor, ...)
 is described by one adapter class. The adapter is the single place that
@@ -6,7 +6,7 @@ knows the environment's markers, instruction-loading rules, config files
 and structure expectations. The core scanner and the gates ask the
 registry; they never hardcode a harness again.
 
-Design rules (see docs/GAP-ANALYSIS.md):
+Design rules:
 - adapters FEED the existing nine gates, they do not replace them;
 - every claim carries evidence and confidence;
 - when a behaviour cannot be confirmed against the real runtime, the
@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-# --- conformance vocabulary (TZ 3.0 section 5.2) ----------------------
+# --- conformance vocabulary -------------------------------------------
 # Every adapter capability carries one of these honesty statuses. They
 # describe HOW WE KNOW something, separate from whether it works.
 CAPABILITY_STATUSES = (
@@ -30,7 +30,7 @@ CAPABILITY_STATUSES = (
     'unknown',           # not enough data — the default
 )
 
-# The capability names every adapter is graded on (TZ section 5.3).
+# The capability names every adapter is graded on.
 CAPABILITY_KEYS = (
     'detection',              # project + home discovery
     'user_settings',          # user-level configuration discovery
@@ -76,7 +76,7 @@ class HarnessContext:
 
 @dataclass
 class Detection:
-    """Result of harness detection for one adapter (TZ section 4).
+    """Result of harness detection for one adapter.
 
     status: 'detected'  - project-level markers present
             'possible'  - only weak/global signals
@@ -95,7 +95,7 @@ class Detection:
 
 @dataclass
 class InstructionSource:
-    """One instruction file the harness may load (TZ section 6.1)."""
+    """One instruction file the harness may load."""
     path: Path
     scope: str          # global | user | project | nested | path_scoped | imported
     description: str = ''
@@ -120,7 +120,7 @@ class InstructionLink:
 
 @dataclass
 class InstructionChain:
-    """Effective instruction set for a target directory (TZ section 7).
+    """Effective instruction set for a target directory.
 
     approximated=True means the chain follows the documented loading
     model, not a verified runtime harness.
@@ -192,15 +192,15 @@ class HarnessAdapter:
 
     harness_id: str = ''            # 'claude_code'
     display_name: str = ''          # 'Claude Code'
-    # adapter version, independent of the product version (TZ module 9):
+    # adapter version, independent of the product version:
     # bump only when THIS adapter's behaviour or checks change
     adapter_version: str = '1.0.0'
-    # --- spec provenance (TZ 3.8): keep honest, update when re-verified
+    # --- spec provenance: keep honest, update when re-verified
     spec_source: str = ''           # URL of the official documentation
     spec_verified: str = ''         # 'YYYY-MM-DD' of the last check
     supported_versions: str = ''    # free text, '' = unverified
     known_limitations: list = []    # human-readable strings
-    # --- conformance (TZ 3.0 section 5): per-capability honesty status.
+    # --- conformance: per-capability honesty status.
     # Keys are capability names from CAPABILITY_KEYS; values from
     # CAPABILITY_STATUSES. A capability absent here reads as 'unknown'
     # downstream — never as pass.
@@ -233,7 +233,7 @@ class HarnessAdapter:
 
     # ------------------------------------------------- instructions
     def instruction_sources(self, ctx: HarnessContext) -> list:
-        """All instruction sources this harness may read (TZ 6.1)."""
+        """All instruction sources this harness may read."""
         return []
 
     def resolve_chain(self, ctx: HarnessContext,
@@ -285,7 +285,7 @@ class HarnessAdapter:
         }
 
     def adapter_quality(self) -> dict:
-        """Diagnostic quality of THIS adapter (TZ 5.5) — deliberately
+        """Diagnostic quality of THIS adapter — deliberately
         separate from workspace health. Statuses map to evidence
         weights; the score is a simple mean, printed with the formula
         so nobody has to trust a bare number. unsupported/unknown

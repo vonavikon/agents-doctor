@@ -1,4 +1,4 @@
-"""P0.2 tests: the unified rollback journal (manifest schema v2).
+"""Tests for the unified rollback journal (manifest schema v2).
 
 Every mutating operation is journaled in one manifest and reversible:
 trash_move (move back), rmdir (recreate the empty directory),

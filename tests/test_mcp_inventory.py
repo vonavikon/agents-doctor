@@ -1,4 +1,4 @@
-"""Tests for mcp_inventory (TZ v2.1.0, MCP Security):
+"""Tests for mcp_inventory:
 inventory shape across harness config formats, and the no-secret-leak
 guarantee (env names only, command heads of two tokens, url hosts)."""
 import json
@@ -203,12 +203,12 @@ class DetectionTest(unittest.TestCase):
         # .zcode/config.json is itself the zcode project marker
         _write(root / '.zcode' / 'config.json',
                json.dumps({'mcp': {'servers': {
-                   'gramax': {'url': 'https://g.example.com/s'}}}}))
+                   'wiki': {'url': 'https://wiki.example.com/s'}}}}))
         inv = collect_mcp_inventory(root, home)
-        srv = _by_name(inv, 'gramax')
+        srv = _by_name(inv, 'wiki')
         self.assertIsNotNone(srv)
         self.assertEqual(srv['harness'], 'zcode')
-        self.assertEqual(srv['url_host'], 'g.example.com')
+        self.assertEqual(srv['url_host'], 'wiki.example.com')
 
 
 class SuspiciousHeuristicTest(unittest.TestCase):

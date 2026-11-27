@@ -1,4 +1,4 @@
-"""Instruction loading simulation (TZ section 7).
+"""Instruction loading simulation.
 
 For a target directory, ask every (or selected) harness adapter to
 resolve its instruction chain, then cross-check the loaded sets for
@@ -69,7 +69,7 @@ def simulate_loading(ctx: HarnessContext,
 
 
 def format_simulation_text(report: dict) -> str:
-    """Plain-text rendering of a simulation report (TZ 7 interface)."""
+    """Plain-text rendering of a simulation report."""
     lines = ['Instruction Loading Simulation', '']
     lines.append('Target: %s' % report['target_dir'])
     if report.get('approximated'):

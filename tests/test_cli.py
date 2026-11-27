@@ -1,4 +1,4 @@
-"""Stage-4 tests: agents_doctor.py CLI (audit / compare / explain / fix).
+"""Tests for the agents_doctor.py CLI (audit / compare / explain / fix).
 
 The fixture is a tiny workspace: one git repository whose AGENTS.md has
 a dead link, one empty directory and no .gitignore, plus an empty home.
