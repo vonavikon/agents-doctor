@@ -3,9 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>agents-doctor — Visual Workspace Explorer</title>
 <link rel="icon" type="image/png" sizes="128x128" href="/static/favicon.png">
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="preload" href="/static/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -17,22 +19,77 @@
   </div>
 
   <nav class="tabs" role="tablist" aria-label="Views">
-    <button class="tab" id="tab-overview"  data-tab="overview"  role="tab" aria-selected="false">Overview</button>
-    <button class="tab" id="tab-tree"      data-tab="tree"      role="tab" aria-selected="false">Tree</button>
-    <button class="tab" id="tab-treemap"   data-tab="treemap"   role="tab" aria-selected="false">TreeMap</button>
-    <button class="tab" id="tab-instructions" data-tab="instructions" role="tab" aria-selected="false">Instructions</button>
-    <button class="tab" id="tab-findings"  data-tab="findings"  role="tab" aria-selected="false">Findings</button>
-    <button class="tab" id="tab-simulate" data-tab="simulate" role="tab" aria-selected="false">Simulate</button>
-    <button class="tab" id="tab-compare"  data-tab="compare"  role="tab" aria-selected="false">Compare</button>
-    <button class="tab" id="tab-history"  data-tab="history"  role="tab" aria-selected="false">History</button>
+    <button class="tab" id="tab-overview" data-tab="overview" role="tab" title="Overview" aria-selected="false">
+      <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="2" width="4.5" height="4.5" rx="1"/>
+        <rect x="9.5" y="2" width="4.5" height="4.5" rx="1"/>
+        <rect x="2" y="9.5" width="4.5" height="4.5" rx="1"/>
+        <rect x="9.5" y="9.5" width="4.5" height="4.5" rx="1"/>
+      </svg>
+      <span class="tab-label">Overview</span>
+    </button>
+    <button class="tab" id="tab-tree" data-tab="tree" role="tab" title="Tree" aria-selected="false">
+      <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="2.75" cy="3" r="1.25" fill="currentColor" stroke="none"/><path d="M5.75 3H14"/>
+        <circle cx="5.25" cy="8" r="1.25" fill="currentColor" stroke="none"/><path d="M8.25 8H14"/>
+        <circle cx="7.75" cy="13" r="1.25" fill="currentColor" stroke="none"/><path d="M10.75 13H14"/>
+      </svg>
+      <span class="tab-label">Tree</span>
+    </button>
+    <button class="tab" id="tab-treemap" data-tab="treemap" role="tab" title="TreeMap" aria-selected="false">
+      <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="2" width="12" height="12" rx="2.5"/><path d="M8 2v12M2 8h12"/>
+      </svg>
+      <span class="tab-label">TreeMap</span>
+    </button>
+    <button class="tab" id="tab-instructions" data-tab="instructions" role="tab" title="Instructions" aria-selected="false">
+      <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 2h3l3.5 3.5v6a1.5 1.5 0 0 1-1.5 1.5h-6A1.5 1.5 0 0 1 3.5 11.5v-8A1.5 1.5 0 0 1 5 2z"/>
+        <path d="M5.75 7.5h4.5M5.75 10h3"/>
+      </svg>
+      <span class="tab-label">Instructions</span>
+    </button>
+    <button class="tab" id="tab-findings" data-tab="findings" role="tab" title="Findings" aria-selected="false">
+      <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 2 2 13.75h12z"/>
+        <path d="M8 7v2.25"/>
+        <circle cx="8" cy="11.5" r="1" fill="currentColor" stroke="none"/>
+      </svg>
+      <span class="tab-label">Findings</span>
+    </button>
+    <button class="tab" id="tab-simulate" data-tab="simulate" role="tab" title="Simulate" aria-selected="false">
+      <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2"/>
+        <path d="M6.25 5.5v5l4-2.5z" fill="currentColor" stroke="none"/>
+      </svg>
+      <span class="tab-label">Simulate</span>
+    </button>
+    <button class="tab" id="tab-compare" data-tab="compare" role="tab" title="Compare" aria-selected="false">
+      <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 4.5H2m3.5-2.25L2 4.5l3.5 2.25M2 11.5h12m-3.5-2.25 3.5 2.25-3.5 2.25"/>
+      </svg>
+      <span class="tab-label">Compare</span>
+    </button>
+    <button class="tab" id="tab-history" data-tab="history" role="tab" title="History" aria-selected="false">
+      <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2.5 2v11.5h11.25"/>
+        <polyline points="4.25 10.5 6.5 7 9 9.25 12.75 4.5"/>
+      </svg>
+      <span class="tab-label">History</span>
+    </button>
   </nav>
 
   <div class="topbar-actions">
     <div class="history-nav">
-      <button id="btn-back" class="icon-btn" title="Back (Alt+Left)" aria-label="Back" disabled>&#9664; Back</button>
-      <button id="btn-fwd"  class="icon-btn" title="Forward (Alt+Right)" aria-label="Forward" disabled>Fwd &#9654;</button>
+      <button id="btn-back" class="icon-btn" title="Back (Alt+Left)" aria-label="Back" disabled>
+        <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m10.25 3.25-4.75 4.75 4.75 4.75"/></svg>
+      </button>
+      <button id="btn-fwd"  class="icon-btn" title="Forward (Alt+Right)" aria-label="Forward" disabled>
+        <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5.75 3.25 4.75 4.75-4.75 4.75"/></svg>
+      </button>
     </div>
-    <button id="btn-rescan" class="btn-accent" title="Rerun the scan in-process and reload">Rescan</button>
+    <button id="btn-rescan" class="btn-accent" title="Rerun the scan in-process and reload">
+      <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.25 7.5A4.5 4.5 0 1 1 8 4.5h2.5m-2.5-2.25 2.5 2.25-2.5 2.25"/></svg><span class="btn-label">Rescan</span></button>
   </div>
 </header>
 
@@ -62,7 +119,10 @@
   <section class="panel tab-panel" id="panel-tree" role="tabpanel" aria-labelledby="tab-tree" hidden>
     <div class="panel-header">
       <div class="toolbar">
-        <input type="search" id="tree-search" class="input" placeholder="Search by name…" aria-label="Search the tree by name; scope selects loaded tree or whole workspace">
+        <span class="search-field">
+          <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.5"/><path d="m10.25 10.25 3.75 3.75"/></svg>
+          <input type="search" id="tree-search" class="input" placeholder="Search by name…" aria-label="Search the tree by name; scope selects loaded tree or whole workspace">
+        </span>
         <label class="inline-label">In
           <select id="tree-search-scope" class="input select" aria-label="Search scope">
             <option value="loaded">loaded tree</option>
@@ -164,7 +224,10 @@
         <label class="inline-label">Harness
           <select id="fnd-harness" class="input select" aria-label="Filter by harness"><option value="">all harnesses</option></select>
         </label>
-        <input type="search" id="fnd-q" class="input grow" placeholder="Search title, description, id, evidence…" aria-label="Search findings">
+        <span class="search-field">
+          <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.5"/><path d="m10.25 10.25 3.75 3.75"/></svg>
+          <input type="search" id="fnd-q" class="input grow" placeholder="Search title, description, id, evidence…" aria-label="Search findings">
+        </span>
         <label class="inline-label checkbox">
           <input type="checkbox" id="fnd-group"> group by directory
         </label>
@@ -195,7 +258,9 @@
       <span class="inspector-path mono" id="insp-path">—</span>
       <span class="badge-row" id="insp-badges"></span>
     </div>
-    <button class="icon-btn" id="insp-close" title="Close (Esc)" aria-label="Close file inspector">&#10005;</button>
+    <button class="icon-btn" id="insp-close" title="Close (Esc)" aria-label="Close file inspector">
+      <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3.5 3.5 9 9m0-9-9 9"/></svg>
+    </button>
   </div>
   <div class="inspector-body">
     <div id="insp-banner"></div>
@@ -210,7 +275,9 @@
     <header class="card-header">
       <span class="mono card-fid" id="card-fid">—</span>
       <span class="badge-row" id="card-badges"></span>
-      <button class="icon-btn" id="card-close" title="Close (Esc)" aria-label="Close finding card">&#10005;</button>
+      <button class="icon-btn" id="card-close" title="Close (Esc)" aria-label="Close finding card">
+        <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3.5 3.5 9 9m0-9-9 9"/></svg>
+      </button>
     </header>
     <div class="card-body" id="card-body"></div>
   </article>

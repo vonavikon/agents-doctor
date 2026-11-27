@@ -6,6 +6,31 @@ follow semantic versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- The visual explorer looks like a native macOS application and follows
+  the system appearance, light and dark. One toolbar carries the eight
+  views as icon-and-label items; content sits in inset grouped surfaces;
+  status and severity are drawn icons in the system colours, and every one
+  keeps its word. Structure, keyboard model, selectors and copy are the
+  same as before.
+- Inter is bundled (`ui/static/fonts/`, SIL Open Font License 1.1) for
+  systems without San Francisco. Apple devices keep their system font. The
+  server sends font files with a font media type.
+- The treemap scale, the score gauge, the trend chart and the chain
+  diagram take their colours from the stylesheet. The treemap colour, its
+  tooltip and the fallback size of a directory now use the metric value:
+  before, the area-scaled layout value was used, so every cell of one
+  level got the same colour and the tooltip showed a number multiplied by
+  the pixel area.
+
+### Fixed
+
+- The overview table carried a literal `ariaLabel` attribute instead of
+  `aria-label`.
+- The tooltip title of a chain diagram box was never a child of its box.
+- The Rescan button changes only its label while a rescan runs.
+
 ### Documentation
 
 - `docs/policies.md` is written in English. The gap analysis that planned

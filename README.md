@@ -39,7 +39,7 @@ Inside the deterministic layer:
 
 - **Harness intelligence** — a registry of adapters, one per environment. Each adapter knows its markers, instruction-loading rules, config files and structure expectations, and feeds the same nine gates ([adapter guide](docs/ADAPTER-GUIDE.md), [support matrix](docs/HARNESS-MATRIX.md)). Detection is honest: a marker plus recent activity reads as detected; one stale file reads as possible, never as proof of use.
 - **Instruction intelligence** — `simulate` shows which instruction files each harness would actually load for a directory (a model of the documented rules, labelled as such), what stays unloaded and why, and where two active sources contradict each other. Cross-harness differences are reported as divergence (warn), never as errors — they may be intentional.
-- **Local web UI** — `agents_doctor.py ui` opens a visual explorer on 127.0.0.1: overview, lazy file tree with per-directory problem counts, findings table, masked file previews, TreeMap, instruction simulation and scan comparison. Read-only; fixes are planned there and applied only via the CLI.
+- **Local web UI** — `agents_doctor.py ui` opens a visual explorer on 127.0.0.1: overview, lazy file tree with per-directory problem counts, findings table, masked file previews, TreeMap, instruction simulation and scan comparison. Read-only; fixes are planned there and applied only via the CLI. The explorer follows the appearance of the system, light or dark.
 
 The scanner only reads. Deletions and edits always stay with the human.
 
@@ -194,7 +194,7 @@ cd qa && python eval.py
 Scenario fixtures with expected results locked before the run; the runner compares the scanner's actual JSON against the locked expectations and writes a report. The current numbers live in the generated line below — never edited by hand (`python tools/check_readme_facts.py`, staleness-gated in CI).
 
 <!-- facts-begin -->
-**Facts:** 1437 tests · QA eval 267 PASS · deterministic scanner, no dependencies
+**Facts:** 1446 tests · QA eval 267 PASS · deterministic scanner, no dependencies
 <!-- facts-end -->
 
 The deterministic core also has a unit and security-regression suite:

@@ -28,8 +28,10 @@ const STATUS_RANK = { fail: 0, warn: 1, unknown: 2, not_applicable: 3, pass: 4 }
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) {
+  for (const [raw, v] of Object.entries(attrs)) {
     if (v === null || v === undefined || v === false) continue;
+    // ariaLabel -> aria-label
+    const k = raw.startsWith('aria') ? raw.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase()) : raw;
     if (k === 'class') node.className = v;
     else if (k === 'text') node.textContent = v;
     else if (k === 'html') node.innerHTML = v;           // trusted, built here only
@@ -299,12 +301,19 @@ function renderOverview() {
   renderScoreBlock();
   renderEnvSummary();
 
-  const stLine = el('p', { class: 'conf-note' });
-  const parts = [];
-  for (const st of ['pass', 'fail', 'warn', 'unknown', 'not_applicable']) {
-    parts.push(`${STATUS_GLYPH[st]} ${STATUS_LABEL[st]} ${statusCounts[st] || 0}`);
-  }
-  stLine.textContent = 'Finding statuses: ' + parts.join('   ·   ');
+  const stLine = el('p', { class: 'conf-note status-line', text: 'Finding statuses: ' });
+  ['pass', 'fail', 'warn', 'unknown', 'not_applicable'].forEach((st, i) => {
+    if (i) stLine.append(' · ');
+    // a status-count, not a status-badge: the gates table keeps its nine
+    stLine.append(
+      el('span', {
+        class: 'status-count st-' + st,
+        title: 'status: ' + st,
+        html: `<span class="st-glyph" aria-hidden="true">${STATUS_GLYPH[st]}</span>${STATUS_LABEL[st]}`,
+      }),
+      String(statusCounts[st] || 0),
+    );
+  });
   body.append(stLine);
 
   body.append(el('div', { class: 'ov-section-title', text: 'Gates' }));
@@ -610,12 +619,12 @@ function buildRowEl(child, depth) {
   });
   row.append(
     el('span', { class: 'tree-twister', 'aria-hidden': 'true', text: child.is_dir ? (expanded ? '\u25be' : '\u25b8') : '' }),
-    el('span', { class: 'tree-icon', 'aria-hidden': 'true', text: child.is_dir ? 'dir' : 'file' }),
+    el('span', { class: 'tree-icon ' + (child.is_dir ? 'tree-icon-dir' : 'tree-icon-file'), 'aria-hidden': 'true', text: child.is_dir ? 'dir' : 'file' }),
   );
   const nameSpan = el('span', { class: 'tree-name', text: child.name });
   row.append(nameSpan);
   if (child.symlink) {
-    row.append(el('span', { class: 'tree-symlink', title: 'symbolic link', text: 'symlink \u21aa' }));
+    row.append(el('span', { class: 'tree-symlink', title: 'symbolic link', text: 'symlink' }));
   }
   if (total > 0) row.append(badgeRowFromCounts(child.counts));
 
@@ -693,9 +702,6 @@ function moreRowEl(dirPath, entry, depth) {
     'data-more': dirPath,
     title: 'load the next page of entries',
   });
-  row.style.display = 'flex';
-  row.style.alignItems = 'center';
-  row.style.cursor = 'pointer';
   row.style.paddingLeft = (depth * 16 + 22) + 'px';
   row.append(el('span', {
     class: 'tree-truncated',
@@ -1099,7 +1105,7 @@ function renderSearchResults() {
       'data-path': m.path,
       title: 'reveal ' + m.path + ' in the tree' + (isDir ? '' : ' and open it in the inspector'),
     });
-    item.append(el('span', { class: 'tree-icon', 'aria-hidden': 'true', text: isDir ? 'dir' : 'file' }));
+    item.append(el('span', { class: 'tree-icon ' + (isDir ? 'tree-icon-dir' : 'tree-icon-file'), 'aria-hidden': 'true', text: isDir ? 'dir' : 'file' }));
     item.append(el('span', { class: 'tree-name mono', text: m.path }));
     const br = badgeRowFromCounts(m.counts || {});
     if (br.childNodes.length) item.append(br);
@@ -1274,7 +1280,8 @@ function renderFindings() {
       el('td', {}, statusBadge(x.status)),
       el('td', {},
         x.autofix_available
-          ? el('span', { class: 'autofix-yes', title: 'automatic fix available', text: 'auto \u2713' })
+          ? el('span', { class: 'autofix-yes', title: 'automatic fix available',
+              html: 'auto <span class="st-glyph" aria-hidden="true">\u2713</span>' })
           : el('span', { class: 'autofix-no', title: 'no automatic fix', text: '\u2014' })),
     );
     const open = () => openFindingCard(x.fid, { push: true });
@@ -1673,7 +1680,9 @@ function squarifyLayout(items, x, y, w, h) {
   const total = sorted.reduce((s, it) => s + it.value, 0);
   const scale = (w * h) / total;
   let cx = x, cy = y, cw = w, ch = h;
-  let queue = sorted.map((it) => ({ ...it, value: it.value * scale }));
+  // the layout computes in area units; the rect keeps the metric value for
+  // the colour scale, the tooltip and the fallback size of a directory
+  let queue = sorted.map((it) => ({ ...it, metric: it.value, value: it.value * scale }));
 
   const worst = (row, side) => {
     const sum = row.reduce((s, it) => s + it.value, 0);
@@ -1711,14 +1720,6 @@ function squarifyLayout(items, x, y, w, h) {
     }
   }
   return rects;
-}
-
-const TM_TOP = [34, 38, 47];    // low value bg
-const TM_HOT = [122, 96, 66];   // high value bg (warm tint, readable with dark text? keep light text)
-function cellBackground(v, max) {
-  const t = max > 0 ? Math.min(1, v / max) : 0;
-  const c = TM_TOP.map((a, i) => Math.round(a + (TM_HOT[i] - a) * t));
-  return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
 
 function renderTreemap() {
@@ -1781,14 +1782,8 @@ function renderTreemapLegend(total, max) {
   if (!box) return;
   box.textContent = '';
   if (!total) return;
-  const bar = el('span', { 'aria-hidden': 'true' });
-  bar.style.display = 'inline-block';
-  bar.style.width = '110px';
-  bar.style.height = '9px';
-  bar.style.verticalAlign = 'middle';
-  bar.style.margin = '0 6px';
-  bar.style.borderRadius = '2px';
-  bar.style.background = `linear-gradient(to right, ${cellBackground(0, max)}, ${cellBackground(max, max)})`;
+  const bar = el('span', { class: 'tm-scale-bar', 'aria-hidden': 'true' });
+  bar.style.background = 'linear-gradient(to right, var(--tm-top), var(--tm-hot))';
   box.append(el('span', { text: 'scale 0' }), bar,
     el('span', { text: metricLabel(max) + ' (largest cell)' }));
   if (state.treemap.metric === 'disk') {
@@ -1836,17 +1831,19 @@ function renderTreemapCell(r, max, depth) {
     role: 'button',
     'data-path': n.path,
     'data-isdir': String(isDir),
-    'aria-label': tmTooltipText(n, r.value),
+    'aria-label': tmTooltipText(n, r.metric),
   });
   cell.style.left = r.x + 'px';
   cell.style.top = r.y + 'px';
   cell.style.width = r.w + 'px';
   cell.style.height = r.h + 'px';
-  cell.style.background = cellBackground(r.value, max);
+  // position on the colour scale, 0 to 1; style.css paints the cell from it
+  const t = max > 0 ? Math.min(1, r.metric / max) : 0;
+  cell.style.setProperty('--tm-t', t.toFixed(3));
   if (dirPartial) {
     // hatch overlay directly on the cell (not only in the tooltip)
     cell.style.backgroundImage =
-      'repeating-linear-gradient(45deg, rgba(255,255,255,0.09) 0 5px, rgba(255,255,255,0) 5px 11px)';
+      'repeating-linear-gradient(45deg, var(--tm-hatch) 0 5px, transparent 5px 11px)';
   }
 
   const dom = dominantSeverity(n.counts || {});
@@ -1867,14 +1864,12 @@ function renderTreemapCell(r, max, depth) {
       ? humanSize(Number(n.size) || 0)
       : (s && s.totalBytes != null
         ? (s.complete ? '' : '\u2248 ') + humanSize(s.totalBytes)
-        : (statsPending ? '\u2026' : '\u2248 ' + humanSize(r.value)));
+        : (statsPending ? '\u2026' : '\u2248 ' + humanSize(r.metric)));
     if (sizeTxt) {
       const sp = el('span', { class: 'tm-size mono', 'aria-hidden': 'true', text: sizeTxt });
       sp.style.position = 'absolute';
       sp.style.right = '4px';
       sp.style.bottom = '2px';
-      sp.style.fontSize = '10px';
-      sp.style.color = 'rgba(214,217,224,.8)';
       cell.append(sp);
     }
   }
@@ -1888,8 +1883,6 @@ function renderTreemapCell(r, max, depth) {
     pm.style.position = 'absolute';
     pm.style.left = '3px';
     pm.style.bottom = '2px';
-    pm.style.fontSize = '10px';
-    pm.style.color = 'rgba(214,217,224,.8)';
     cell.append(pm);
   }
 
@@ -2448,7 +2441,6 @@ function renderInstructionsDiagram() {
 
 /** SVG chain diagram built as a string: one rectangle per source, arrows downward. */
 function chainSvg(hid, links) {
-  const INK = '#d6d9e0', BOX = '#22262f', EDGE = '#5289c7', ARROW = '#8b919d';
   const labels = links.map((l) => `${l.scope} \u2014 ${fileNameOf(l.path)} (prec ${l.precedence != null ? l.precedence : '?'})`);
   const boxW = Math.max(260, Math.min(720, ...labels.map((t) => t.length * 7.4 + 36)));
   const boxH = 34, gap = 22, pad = 12;
@@ -2459,13 +2451,12 @@ function chainSvg(hid, links) {
   s += `<title>Load chain for ${esc(hid)}</title>`;
   links.forEach((l, i) => {
     const y = pad + i * (boxH + gap);
-    s += `<rect x="${cx - boxW / 2}" y="${y}" width="${boxW}" height="${boxH}" rx="5" fill="${BOX}" stroke="${EDGE}" stroke-width="1"/>`;
-    s += `<text x="${cx}" y="${y + boxH / 2 + 4}" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="12" fill="${INK}">${esc(labels[i])}</text>`;
-    s += `<title>${esc(l.path)}</title>`;
+    s += `<rect x="${cx - boxW / 2}" y="${y}" width="${boxW}" height="${boxH}" rx="5" class="chain-box" stroke-width="1"><title>${esc(l.path)}</title></rect>`;
+    s += `<text x="${cx}" y="${y + boxH / 2 + 4}" text-anchor="middle" font-size="12" class="chain-text">${esc(labels[i])}</text>`;
     if (i < links.length - 1) {
       const y1 = y + boxH, y2 = y + boxH + gap;
-      s += `<line x1="${cx}" y1="${y1}" x2="${cx}" y2="${y2 - 6}" stroke="${ARROW}" stroke-width="1.4"/>`;
-      s += `<polygon points="${cx - 4},${y2 - 7} ${cx + 4},${y2 - 7} ${cx},${y2}" fill="${ARROW}"/>`;
+      s += `<line x1="${cx}" y1="${y1}" x2="${cx}" y2="${y2 - 6}" class="chain-line" stroke-width="1.4"/>`;
+      s += `<polygon points="${cx - 4},${y2 - 7} ${cx + 4},${y2 - 7} ${cx},${y2}" class="chain-arrow"/>`;
     }
   });
   s += '</svg>';
@@ -2593,10 +2584,10 @@ function renderCompare(cmp, currentFindings) {
 /* ------------------------------------------------------------- health score */
 
 function scoreColor(v) {
-  if (v == null) return '#646b78';
-  if (v >= 80) return '#46ad6e';
-  if (v >= 60) return '#e08b28';
-  return '#e5534b';
+  if (v == null) return 'var(--text-faint)';
+  if (v >= 80) return 'var(--score-good)';
+  if (v >= 60) return 'var(--score-mid)';
+  return 'var(--score-bad)';
 }
 
 function scoreGaugeSvg(score) {
@@ -2605,12 +2596,12 @@ function scoreGaugeSvg(score) {
   const frac = score == null ? 0 : Math.max(0, Math.min(100, score)) / 100;
   let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="Workspace Health Score ${score == null ? 'unknown' : score + ' of 100'}" class="score-gauge">`;
   s += '<title>Workspace Health Score</title>';
-  s += `<circle cx="60" cy="60" r="${R}" fill="none" stroke="#3a4150" stroke-width="10"/>`;
+  s += `<circle cx="60" cy="60" r="${R}" class="gauge-track" stroke-width="10"/>`;
   if (score != null) {
-    s += `<circle cx="60" cy="60" r="${R}" fill="none" stroke="${scoreColor(score)}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(C * frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 60 60)"/>`;
+    s += `<circle cx="60" cy="60" r="${R}" class="gauge-arc" style="--gauge-color:${scoreColor(score)}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(C * frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 60 60)"/>`;
   }
-  s += `<text x="60" y="57" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="26" fill="#d6d9e0">${score == null ? '?' : Math.round(score)}</text>`;
-  s += `<text x="60" y="76" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="10" fill="#8b919d">/ 100</text>`;
+  s += `<text x="60" y="57" text-anchor="middle" font-size="26" class="gauge-value">${score == null ? '?' : Math.round(score)}</text>`;
+  s += `<text x="60" y="76" text-anchor="middle" font-size="10" class="gauge-total">/ 100</text>`;
   s += '</svg>';
   return s;
 }
@@ -2769,7 +2760,10 @@ function renderHistoryTab() {
   body.append(el('div', { class: 'ov-section-title', text: 'Findings over time' }));
   const points = (state.hist.trend && state.hist.trend.points) || [];
   if (points.length) {
-    body.append(el('div', { class: 'hist-chart', html: trendSvg(points) }));
+    const chart = el('div', { class: 'hist-chart' });
+    body.append(chart);
+    // clientWidth counts the padding of the card, 16px on each side
+    chart.innerHTML = trendSvg(points, chart.clientWidth - 32);
   } else {
     body.append(el('div', {
       class: 'empty-state',
@@ -2927,8 +2921,12 @@ const HIST_DIFF_SECTIONS = [
 
 /** Findings-per-scan chart: SVG polyline, one point per scan, x scaled
     by scan time, separate lines for total / critical / high. */
-function trendSvg(points) {
-  const W = 760, H = 220, L = 44, Rp = 12, T = 14, B = 34;
+/* W is the inner width of the chart card in pixels: the chart is drawn at
+   its real size, so its labels keep 10px at every window width */
+function trendSvg(points, W) {
+  W = Math.max(320, Math.min(1800, W || 760));
+  // T leaves the legend its own band above the plot
+  const H = 220, L = 44, Rp = 12, T = 26, B = 34;
   const iw = W - L - Rp, ih = H - T - B;
   const ts = points.map((p) => Date.parse(p.ts));
   const t0 = Math.min(...ts), t1 = Math.max(...ts);
@@ -2936,37 +2934,36 @@ function trendSvg(points) {
   const maxV = Math.max(1, ...points.map((p) => Number(p.total) || 0));
   const y = (v) => T + ih * (1 - v / maxV);
   const line = (key) => points.map((p, i) => `${x(i).toFixed(1)},${y(Number(p[key]) || 0).toFixed(1)}`).join(' ');
-  const INK = '#d6d9e0', MUT = '#8b919d', GRID = '#2d323d';
   const series = [
-    { key: 'total', color: '#5289c7' },
-    { key: 'critical', color: '#e5534b' },
-    { key: 'high', color: '#e08b28' },
+    { key: 'total', class: 'series-total' },
+    { key: 'critical', class: 'series-critical' },
+    { key: 'high', class: 'series-high' },
   ];
   let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Findings over time, ${points.length} scans" class="trend-svg">`;
   s += '<title>Findings per scan</title>';
   for (const frac of [0, 0.5, 1]) {
     const gy = (T + ih * (1 - frac)).toFixed(1);
-    s += `<line x1="${L}" y1="${gy}" x2="${W - Rp}" y2="${gy}" stroke="${GRID}" stroke-width="1"/>`;
-    s += `<text x="${L - 6}" y="${Number(gy) + 4}" text-anchor="end" font-family="ui-monospace,Consolas,monospace" font-size="10" fill="${MUT}">${Math.round(maxV * frac)}</text>`;
+    s += `<line x1="${L}" y1="${gy}" x2="${W - Rp}" y2="${gy}" class="trend-grid" stroke-width="1"/>`;
+    s += `<text x="${L - 6}" y="${Number(gy) + 4}" text-anchor="end" font-size="10" class="trend-label">${Math.round(maxV * frac)}</text>`;
   }
   for (const sr of series) {
-    s += `<polyline points="${line(sr.key)}" fill="none" stroke="${sr.color}" stroke-width="1.6"/>`;
+    s += `<polyline points="${line(sr.key)}" class="${sr.class}" stroke-width="1.6"/>`;
   }
   points.forEach((p, i) => {
     for (const sr of series) {
-      s += `<circle cx="${x(i).toFixed(1)}" cy="${y(Number(p[sr.key]) || 0).toFixed(1)}" r="2.6" fill="${sr.color}"><title>${esc(p.ts || '?')}: ${sr.key} ${p[sr.key] || 0} (total ${p.total || 0})</title></circle>`;
+      s += `<circle cx="${x(i).toFixed(1)}" cy="${y(Number(p[sr.key]) || 0).toFixed(1)}" r="2.6" class="${sr.class}"><title>${esc(p.ts || '?')}: ${sr.key} ${p[sr.key] || 0} (total ${p.total || 0})</title></circle>`;
     }
   });
   const xlbl = (i, anchor) => {
-    s += `<text x="${x(i).toFixed(1)}" y="${H - 10}" text-anchor="${anchor}" font-family="ui-monospace,Consolas,monospace" font-size="10" fill="${MUT}">${esc(String(points[i].ts || '').slice(0, 10))}</text>`;
+    s += `<text x="${x(i).toFixed(1)}" y="${H - 10}" text-anchor="${anchor}" font-size="10" class="trend-label">${esc(String(points[i].ts || '').slice(0, 10))}</text>`;
   };
   xlbl(0, 'start');
   if (points.length > 2) xlbl(Math.floor((points.length - 1) / 2), 'middle');
   if (points.length > 1) xlbl(points.length - 1, 'end');
   let lx = L + 4;
   for (const sr of series) {
-    s += `<line x1="${lx}" y1="${T - 4}" x2="${lx + 14}" y2="${T - 4}" stroke="${sr.color}" stroke-width="2"/>`;
-    s += `<text x="${lx + 18}" y="${T - 1}" font-family="ui-monospace,Consolas,monospace" font-size="10" fill="${INK}">${sr.key}</text>`;
+    s += `<line x1="${lx}" y1="${T - 4}" x2="${lx + 14}" y2="${T - 4}" class="${sr.class}" stroke-width="2"/>`;
+    s += `<text x="${lx + 18}" y="${T - 1}" font-size="10" class="trend-legend-text">${sr.key}</text>`;
     lx += 30 + sr.key.length * 6;
   }
   s += '</svg>';
@@ -2978,7 +2975,7 @@ function trendSvg(points) {
 async function rescan() {
   const btn = $('btn-rescan');
   btn.disabled = true;
-  btn.textContent = 'Rescanning…';
+  setRescanLabel('Rescanning…');
   try {
     const res = await api('/api/rescan', {}, 'POST');
     // drop all caches, keep filters and UI state
@@ -3029,8 +3026,14 @@ async function rescan() {
     toast('Rescan failed: ' + e.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Rescan';
+    setRescanLabel('Rescan');
   }
+}
+
+/* Only the word changes: the button's icon must survive the rescan. */
+function setRescanLabel(text) {
+  const btn = $('btn-rescan');
+  (btn.querySelector('.btn-label') || btn).textContent = text;
 }
 
 /* ------------------------------------------------------------- global keys */
@@ -3125,6 +3128,7 @@ function bindUI() {
 
   let resizeTimer = null;
   let treeResizeTimer = null;
+  let histResizeTimer = null;
   window.addEventListener('resize', () => {
     if (state.tab === 'treemap' && state.treemap.nodes.size) {
       clearTimeout(resizeTimer);
@@ -3133,6 +3137,10 @@ function bindUI() {
     if (state.tab === 'tree' && state.tree.flat) {
       clearTimeout(treeResizeTimer);
       treeResizeTimer = setTimeout(renderTreeWindow, 100);
+    }
+    if (state.tab === 'history' && ((state.hist.trend && state.hist.trend.points) || []).length) {
+      clearTimeout(histResizeTimer);
+      histResizeTimer = setTimeout(renderHistoryTab, 150);
     }
   });
 
@@ -3151,31 +3159,8 @@ function setTreemapMetric(m) {
   if (state.treemap.nodes.size) renderTreemap();
 }
 
-/* Inline styles for the aux containers (search results dropdown,
-   treemap scale legend) — kept out of style.css on purpose. */
-function styleAuxBoxes() {
-  const srb = $('tree-search-results');
-  if (srb) {
-    srb.style.maxHeight = '240px';
-    srb.style.overflowY = 'auto';
-    srb.style.padding = '2px 10px 6px';
-    srb.style.borderBottom = '1px solid var(--border)';
-    srb.style.background = 'rgba(20,22,27,.6)';
-  }
-  const lg = $('treemap-legend');
-  if (lg) {
-    lg.style.padding = '2px 10px';
-    lg.style.fontSize = '11px';
-    lg.style.color = 'var(--text-muted)';
-    lg.style.whiteSpace = 'nowrap';
-    lg.style.overflow = 'hidden';
-    lg.style.textOverflow = 'ellipsis';
-  }
-}
-
 function boot() {
   bindUI();
-  styleAuxBoxes();
   updateHistoryButtons();
   switchTab('overview');
 }

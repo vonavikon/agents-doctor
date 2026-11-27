@@ -144,6 +144,21 @@ class ApiTest(unittest.TestCase):
         self.assertTrue(out2['supported'])
         self.assertEqual(out2['summary']['new'], 0)
 
+    def test_compare_leaves_the_scan_untouched(self):
+        rep, root, home = _ws_with_secret()
+        state = UiState(rep, root)
+        state.baseline = {'findings': []}      # everything is new
+        before = [f.get('fp') for f in rep['findings']]
+        first = srv.api_compare(state, {})
+        second = srv.api_compare(state, {})
+        self.assertEqual(first['summary']['new'], len(rep['findings']))
+        # the first request used to strip the fingerprints from the scan,
+        # and every later diff came back empty
+        self.assertEqual(second['summary'], first['summary'])
+        self.assertEqual([f.get('fp') for f in rep['findings']], before)
+        for group in first['diff'].values():
+            self.assertTrue(all('fp' not in f for f in group))
+
     def test_simulate_endpoint(self):
         rep, root, home = _ws_with_secret()
         state = UiState(rep, root)
@@ -285,6 +300,30 @@ class HttpSecurityTest(unittest.TestCase):
             self.assertIn(directive, csp)
         self.assertEqual(_hdr(headers, 'X-Content-Type-Options'),
                          'nosniff')
+
+    def test_static_font_served_with_font_media_type(self):
+        status, headers, body = _request(
+            self.port, 'GET', '/static/fonts/InterVariable.woff2')
+        self.assertEqual(status, 200)
+        # a font that arrives as text/plain is refused by the browser
+        # under nosniff
+        ctype = _hdr(headers, 'Content-Type') or ''
+        self.assertTrue(ctype.startswith('font/woff2'), ctype)
+        self.assertEqual(_hdr(headers, 'Content-Security-Policy'),
+                         "default-src 'self'; style-src 'self' "
+                         "'unsafe-inline'; img-src 'self' data:")
+        self.assertEqual(_hdr(headers, 'X-Content-Type-Options'),
+                         'nosniff')
+        self.assertEqual(body[:4], b'wOF2')
+
+    def test_static_rejects_dotdot_under_fonts(self):
+        # two levels up from static/fonts sits ui/server.py: plain and
+        # percent-encoded, since the router decodes before it resolves
+        for path in ('/static/fonts/../../server.py',
+                     '/static/fonts/%2e%2e/%2e%2e/server.py'):
+            status, _, body = _request(self.port, 'GET', path)
+            self.assertEqual(status, 403, path)
+            self.assertEqual(json.loads(body), {'error': 'forbidden'})
 
     def test_api_mcp_endpoint(self):
         status, _, body = _request(self.port, 'GET', '/api/mcp')

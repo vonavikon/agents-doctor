@@ -122,7 +122,10 @@ Local web UI on 127.0.0.1: workspace overview, lazy file tree with
 per-directory problem counts, findings explorer, masked file inspector,
 TreeMap (density/risk/size), instruction simulation and scan comparison.
 `--baseline` enables the Compare tab. The UI is read-only; fixes are
-planned (dry run) and applied only via the CLI.
+planned (dry run) and applied only via the CLI. The explorer follows the
+appearance of the system, light or dark, and loads nothing from the
+network: the font it uses on systems without San Francisco ships with it
+(Inter, SIL Open Font License 1.1).
 
 ```
 python skills/agents-doctor/scripts/agents_doctor.py policy <scan.json>

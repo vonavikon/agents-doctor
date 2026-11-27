@@ -75,5 +75,85 @@ class FaviconTest(unittest.TestCase):
         self.assertLess(apple.stat().st_size, 96 * 1024)
 
 
+class BundledFontTest(unittest.TestCase):
+    """The web font ships inside the plugin zip, with its license."""
+
+    def test_font_file_present_and_plausible(self):
+        font = UI / 'fonts' / 'InterVariable.woff2'
+        self.assertTrue(font.is_file())
+        blob = font.read_bytes()
+        self.assertGreaterEqual(len(blob), 100 * 1024)
+        self.assertLessEqual(len(blob), 512 * 1024)
+        # WOFF2 signature: a truncated download or an HTML error page
+        # in place of the font fails here
+        self.assertEqual(blob[:4], b'wOF2')
+
+    def test_license_beside_the_font(self):
+        path = UI / 'fonts' / 'LICENSE-Inter.txt'
+        self.assertTrue(path.is_file())
+        text = path.read_text(encoding='utf-8')
+        self.assertIn('SIL OPEN FONT LICENSE', text)
+
+
+class OfflineAssetsTest(unittest.TestCase):
+    """The explorer loads nothing from the network: every resource the
+    page and the stylesheet point at is served by the local server."""
+
+    def test_index_references_only_local_resources(self):
+        html = (UI / 'index.html').read_text(encoding='utf-8')
+        refs = re.findall(r'\b(?:src|href)="([^"]*)"', html)
+        self.assertTrue(refs, 'expected resource references')
+        for ref in refs:
+            self.assertNotIn('http://', ref)
+            self.assertNotIn('https://', ref)
+            # protocol-relative: //host/path takes the page's scheme
+            self.assertFalse(ref.startswith('//'), ref)
+
+    def test_stylesheet_loads_nothing_remote(self):
+        css = (UI / 'style.css').read_text(encoding='utf-8')
+        # comments are prose and may well mention @import
+        body = re.sub(r'/\*.*?\*/', '', css, flags=re.S)
+        self.assertNotIn('@import', body)
+        urls = re.findall(r'url\(\s*(?:"([^"]*)"|\'([^\']*)\'|([^)"\']*))'
+                          r'\s*\)', body, re.I)
+        self.assertTrue(urls, 'expected at least the font face')
+        for quoted, single, bare in urls:
+            target = quoted or single or bare
+            # a data URI is inline: the http in its SVG namespace is a
+            # name, nothing is fetched
+            self.assertNotRegex(target, r'^(?:https?:)?//', target)
+
+
+class IconConventionTest(unittest.TestCase):
+    """Icons are inline SVG in one stroke; a tab keeps its text label,
+    so the accessible name of the tab is the label alone."""
+
+    TAB_NAMES = ['Overview', 'Tree', 'TreeMap', 'Instructions',
+                 'Findings', 'Simulate', 'Compare', 'History']
+
+    def test_every_tab_has_an_icon_and_a_text_label(self):
+        html = (UI / 'index.html').read_text(encoding='utf-8')
+        tabs = re.findall(r'<button\b[^>]*\bclass="tab"[^>]*>(.*?)</button>',
+                          html, re.S)
+        self.assertEqual(len(tabs), len(self.TAB_NAMES))
+        labels = []
+        for body in tabs:
+            self.assertRegex(body, r'<svg\b[^>]*\bclass="icon"')
+            label = re.search(r'<span class="tab-label">([^<]*)</span>',
+                              body)
+            self.assertIsNotNone(label)
+            labels.append(label.group(1).strip())
+        self.assertEqual(labels, self.TAB_NAMES)
+
+    def test_every_icon_follows_the_convention(self):
+        html = (UI / 'index.html').read_text(encoding='utf-8')
+        icons = [tag for tag in re.findall(r'<svg\b[^>]*>', html)
+                 if re.search(r'\bclass="icon"', tag)]
+        self.assertTrue(icons, 'expected inline icons')
+        for tag in icons:
+            self.assertRegex(tag, r'\bviewBox="0 0 16 16"', tag)
+            self.assertRegex(tag, r'\baria-hidden="true"', tag)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -644,9 +644,12 @@ def api_compare(state: UiState, qs):
             state.report.get('findings') or [])
     except Exception as exc:
         return {'error': str(exc), 'supported': False}
-    for name in ('new', 'resolved', 'persisting', 'changed'):
-        for f in diff.get(name) or []:
-            f.pop('fp', None)   # fingerprints are internal
+    # the diff hands back the stored finding dicts themselves: copy them,
+    # or the first request strips the fingerprints from the scan and every
+    # later diff comes back empty
+    diff = {name: [{k: v for k, v in f.items() if k != 'fp'}
+                   for f in diff.get(name) or []]
+            for name in ('new', 'resolved', 'persisting', 'changed')}
     return {
         'supported': True,
         'baseline_generated_at': state.baseline.get('generated_at'),
@@ -956,7 +959,10 @@ def make_handler(state: UiState, token: str | None = None):
             except OSError:
                 self._json({'error': 'not found'}, 404)
                 return
-            ctype = mimetypes.guess_type(str(target))[0] or 'text/plain'
+            # .woff/.woff2 are missing from some mimetypes registries
+            ctype = {'.woff': 'font/woff', '.woff2': 'font/woff2'}\
+                .get(target.suffix.lower()) \
+                or mimetypes.guess_type(str(target))[0] or 'text/plain'
             self.send_response(200)
             self.send_header('Content-Type',
                              ctype + ('; charset=utf-8'
