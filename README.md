@@ -58,7 +58,7 @@ Since 2.1 there are four more planes, all optional and all offline:
 - Git runs with `GIT_OPTIONAL_LOCKS=0`: the audit cannot refresh or modify the index.
 - The scanner writes exactly one file: the report path passed via `--out`.
 - Git remote URLs are sanitized at the source: userinfo and credential query parameters never reach any artifact; detection happens on the raw value before it is dropped.
-- Fingerprints are HMAC-SHA256 with a per-installation key stored under your user config dir (never in reports, never sent to a model; `python skills/agents-doctor/scripts/fingerprint.py --check` verifies it). Older baselines will show a one-time all-new/all-resolved diff after the format change.
+- Fingerprints are HMAC-SHA256 with a per-installation key stored under your user config dir (never in reports, never sent to a model; `python skills/agents-doctor/scripts/fingerprint.py --check` verifies it). The key changes the fingerprint values of secrets in a report only; the identifiers that baselines and the audit history compare do not depend on it.
 - Deep history scanning is bounded and honest: `--history-depth N` caps it, `--history-all-refs` widens it, and an incomplete or unrequested history scan reads as `unknown`, never as a pass.
 
 ## What it checks

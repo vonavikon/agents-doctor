@@ -25,11 +25,11 @@ No silent fallback: with create=False and no key, or with a broken key,
 callers get FingerprintKeyError and decide themselves. This module never
 falls back to a public salt.
 
-Migration note: the format changed from the old public-salt SHA-256
-('sha256:' prefix, 16 hex chars) to 'hmac256:' + 32 hex chars (128 bits).
-Baselines written by older versions will show a one-time all-new /
-all-resolved diff on the first run after the upgrade; the rules_version
-bump in the scan report documents the change.
+Format: 'hmac256:' + 32 hex chars (128 bits). The key reaches one thing
+only: the fingerprint values of secrets in a report, which tell that
+two findings are the same secret. The identifiers that baselines and
+the audit history compare are built from the file, the line and the
+kind, so a different key never produces a diff by itself.
 
 CLI self-test: python fingerprint.py --check
 """
